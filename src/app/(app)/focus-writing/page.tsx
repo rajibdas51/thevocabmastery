@@ -137,7 +137,7 @@ export default function FocusWritingPage() {
           </Button>
         ) : undefined}
       />
-      <div className="p-8">
+      <div className="p-8 mt-68.75">
         {/* Category filter */}
         <div className="flex gap-2 flex-wrap mb-6">
           {allCats.map(cat => (
@@ -193,7 +193,7 @@ export default function FocusWritingPage() {
 
       {/* Add Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Focus Writing" size="lg">
-        <div className="space-y-4">
+        <div className="space-y-4 ">
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <Input label="Topic Title *" placeholder="e.g. Climate Change and Bangladesh"

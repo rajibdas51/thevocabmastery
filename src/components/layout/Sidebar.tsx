@@ -67,7 +67,7 @@ export default function Sidebar() {
             📚
           </div>
           <span className="font-playfair text-[17px] font-black bg-gradient-to-r from-white to-[#a78bfa] bg-clip-text text-transparent">
-            VocabMaster
+            ThevocabMastery
           </span>
         </div>
       </div>

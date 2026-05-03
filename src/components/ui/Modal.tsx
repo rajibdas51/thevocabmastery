@@ -31,7 +31,7 @@ export default function Modal({ open, onClose, title, children, size = 'md', cla
     >
       <div
         className={cn(
-          'relative w-full bg-[#12121a] border border-white/10 rounded-2xl p-6 shadow-2xl',
+          'relative w-full mt-63 bg-[#12121a] border border-white/10 rounded-2xl p-6 shadow-2xl',
           'animate-fade-up max-h-[90vh] overflow-y-auto',
           sizes[size],
           className

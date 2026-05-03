@@ -126,10 +126,7 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* Demo hint */}
-          <p className="text-center text-[11px] text-[#3a3a52] mt-4">
-            Set NEXT_PUBLIC_ADMIN_EMAIL in .env to give yourself admin access
-          </p>
+         
         </div>
       </div>
       <Toaster />

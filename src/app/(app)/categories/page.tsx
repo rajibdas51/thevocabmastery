@@ -6,7 +6,7 @@ import WordCard from '@/components/words/WordCard'
 import PageHeader from '@/components/layout/PageHeader'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import ProgressBar from '@/components/ui/ProgressBar'
+import ProgressBar from '@/components/ui/Progressbar'
 import { ArrowLeft } from 'lucide-react'
 import type { Category, Word } from '@/types'
 
