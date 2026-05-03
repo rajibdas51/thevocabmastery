@@ -1,12 +1,15 @@
 // ============================================================
-// Thevocabmastery - Central Type Definitions
-// These mirror your Supabase schema 1:1 for easy migration
+// VocabMaster - Central Type Definitions
 // ============================================================
 
 export type UserRole = 'user' | 'admin'
 export type WordStatus = 'new' | 'learning' | 'learned'
 export type ExamStatus = 'upcoming' | 'live' | 'completed' | 'cancelled'
 export type Difficulty = 'easy' | 'medium' | 'hard'
+export type PartOfSpeech =
+  | 'noun' | 'verb' | 'adjective' | 'adverb'
+  | 'preposition' | 'conjunction' | 'interjection' | 'pronoun'
+export type QuizType = 'meaning' | 'synonym' | 'antonym' | 'mixed'
 
 export interface Profile {
   id: string
@@ -43,18 +46,14 @@ export interface Word {
   synonyms: string[]
   antonyms: string[]
   example: string | null
+  part_of_speech: PartOfSpeech | null
+  pronunciation: string | null
   is_global: boolean
   created_by: string | null
   created_at: string
   updated_at: string
-  // Joined fields
   categories?: Category[]
   user_progress?: UserWordProgress | null
-}
-
-export interface WordCategory {
-  word_id: string
-  category_id: string
 }
 
 export interface UserWordProgress {
@@ -71,6 +70,7 @@ export interface QuizAttempt {
   id: string
   user_id: string
   category_id: string | null
+  quiz_type: QuizType
   score: number
   total_questions: number
   percentage: number
@@ -93,6 +93,8 @@ export interface QuizQuestion {
   bangla_meaning: string | null
   correct_answer: string
   options: string[]
+  question_label: string
+  quiz_type: QuizType
 }
 
 export interface LiveExam {
@@ -108,7 +110,6 @@ export interface LiveExam {
   created_by: string | null
   created_at: string
   updated_at: string
-  // Joined
   category?: Category | null
   registration?: ExamRegistration | null
   result?: ExamResult | null
@@ -144,7 +145,6 @@ export interface ExamResult {
   answers: QuizAnswer[] | null
   rank: number | null
   submitted_at: string
-  // Joined
   profile?: Pick<Profile, 'id' | 'full_name' | 'avatar_url'>
 }
 
@@ -160,39 +160,15 @@ export interface FocusWriting {
   updated_at: string
 }
 
-export interface GovtQuestion {
-  id: string
-  question: string
-  options: GovtQuestionOption[]
-  explanation: string | null
-  exam_name: string
-  exam_year: number | null
-  subject: string | null
-  topic: string | null
-  difficulty: Difficulty | null
-  created_by: string | null
-  created_at: string
-}
-
-export interface GovtQuestionOption {
-  label: string
-  text: string
-  is_correct: boolean
-}
-
 export interface WordOfDay {
   id: string
   word_id: string
   display_date: string
   created_by: string | null
   created_at: string
-  // Joined
   word?: Word
 }
 
-// ============================================================
-// API Response types (abstract layer for easy migration)
-// ============================================================
 export interface ApiResponse<T> {
   data: T | null
   error: string | null
@@ -207,9 +183,6 @@ export interface PaginatedResponse<T> {
   error: string | null
 }
 
-// ============================================================
-// Form / Input types
-// ============================================================
 export interface CreateWordInput {
   word: string
   bangla_meaning?: string
@@ -217,16 +190,18 @@ export interface CreateWordInput {
   synonyms: string[]
   antonyms: string[]
   example?: string
+  part_of_speech?: PartOfSpeech
+  pronunciation?: string
   category_ids: string[]
   new_category_name?: string
   new_category_color?: string
 }
 
-export interface CreateCategoryInput {
-  name: string
-  description?: string
-  color: string
-  is_global?: boolean
+export interface CreateFocusWritingInput {
+  title: string
+  category: string
+  content: string
+  tags?: string[]
 }
 
 export interface CreateExamInput {
@@ -238,25 +213,6 @@ export interface CreateExamInput {
   question_count: number
 }
 
-export interface CreateFocusWritingInput {
-  title: string
-  category: string
-  content: string
-  tags?: string[]
-}
-
-export interface QuizConfig {
-  category_id: string
-  question_count: number
-  mode: 'eng_to_meaning' | 'eng_to_bangla' | 'bangla_to_eng'
-}
-
-export interface FlashcardConfig {
-  category_id: string
-  mode: 'eng_to_bangla' | 'bangla_to_eng' | 'eng_to_meaning'
-}
-
-// Dashboard stats
 export interface DashboardStats {
   words_learned: number
   total_words: number
@@ -274,4 +230,15 @@ export interface CategoryProgress {
   learned: number
   total: number
   percentage: number
+}
+
+export const POS_LABELS: Record<PartOfSpeech, { short: string; color: string }> = {
+  noun:         { short: 'n.',    color: '#60a5fa' },
+  verb:         { short: 'v.',    color: '#34d399' },
+  adjective:    { short: 'adj.',  color: '#a78bfa' },
+  adverb:       { short: 'adv.',  color: '#fbbf24' },
+  preposition:  { short: 'prep.', color: '#f87171' },
+  conjunction:  { short: 'conj.', color: '#fb923c' },
+  interjection: { short: 'int.',  color: '#e879f9' },
+  pronoun:      { short: 'pron.', color: '#22d3ee' },
 }

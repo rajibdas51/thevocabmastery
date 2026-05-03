@@ -1,22 +1,16 @@
 /**
- * thevocabmaster Database Service Layer
- *
- * ⚠️  MIGRATION NOTE:
- * All database interactions go through this file ONLY.
- * To migrate away from Supabase, replace the implementation
- * in each function — the calling code never needs to change.
- *
- * Currently backed by: Supabase (PostgreSQL)
- * To migrate to: any PostgreSQL provider, PlanetScale, MongoDB, etc.
+ * VocabMaster Database Service Layer
+ * All DB calls go through here. To migrate away from Supabase,
+ * only change this file — calling code never needs to change.
  */
 
 import { createClient } from '@/lib/supabase/client'
 import type {
   Profile, Category, Word, UserWordProgress, QuizAttempt,
   LiveExam, ExamRegistration, ExamResult, FocusWriting,
-  GovtQuestion, WordOfDay, CreateWordInput, CreateCategoryInput,
-  CreateExamInput, CreateFocusWritingInput, PaginatedResponse,
-  ApiResponse, DashboardStats, QuizQuestion,
+  WordOfDay, CreateWordInput, CreateExamInput,
+  CreateFocusWritingInput, PaginatedResponse, ApiResponse,
+  DashboardStats, QuizQuestion, QuizType,
 } from '@/types'
 
 // ─── WORDS ────────────────────────────────────────────────────
@@ -36,12 +30,7 @@ export async function getWords(opts?: {
 
   let query = db
     .from('words')
-    .select(`
-      *,
-      categories:word_categories(
-        category:categories(*)
-      )
-    `, { count: 'exact' })
+    .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -63,7 +52,6 @@ export async function getWords(opts?: {
 
   const { data, count, error } = await query
 
-  // flatten nested categories join
   const words: Word[] = (data ?? []).map((w: any) => ({
     ...w,
     categories: (w.categories ?? []).map((wc: any) => wc.category).filter(Boolean),
@@ -83,24 +71,18 @@ export async function getWordById(id: string): Promise<ApiResponse<Word>> {
   const db = createClient()
   const { data, error } = await db
     .from('words')
-    .select(`*, categories:word_categories(category:categories(*))`)
+    .select('*, categories:word_categories(category:categories(*))')
     .eq('id', id)
     .single()
-
   if (error || !data) return { data: null, error: error?.message ?? 'Not found' }
   return {
-    data: {
-      ...data,
-      categories: (data.categories ?? []).map((wc: any) => wc.category).filter(Boolean),
-    },
+    data: { ...data, categories: (data.categories ?? []).map((wc: any) => wc.category).filter(Boolean) },
     error: null,
   }
 }
 
 export async function createWord(input: CreateWordInput, userId: string): Promise<ApiResponse<Word>> {
   const db = createClient()
-
-  // 1. Create the word
   const { data: word, error } = await db
     .from('words')
     .insert({
@@ -110,7 +92,9 @@ export async function createWord(input: CreateWordInput, userId: string): Promis
       synonyms: input.synonyms,
       antonyms: input.antonyms,
       example: input.example?.trim() || null,
-      is_global: false, // user words are always private
+      part_of_speech: input.part_of_speech || null,
+      pronunciation: input.pronunciation?.trim() || null,
+      is_global: false,
       created_by: userId,
     })
     .select()
@@ -118,27 +102,17 @@ export async function createWord(input: CreateWordInput, userId: string): Promis
 
   if (error || !word) return { data: null, error: error?.message ?? 'Failed to create word' }
 
-  // 2. Handle new category creation
   let categoryIds = [...input.category_ids]
   if (input.new_category_name) {
     const { data: newCat } = await db
       .from('categories')
-      .insert({
-        name: input.new_category_name,
-        color: input.new_category_color ?? '#6366f1',
-        is_global: false,
-        created_by: userId,
-      })
-      .select()
-      .single()
+      .insert({ name: input.new_category_name, color: input.new_category_color ?? '#6366f1', is_global: false, created_by: userId })
+      .select().single()
     if (newCat) categoryIds.push(newCat.id)
   }
 
-  // 3. Link word to categories
   if (categoryIds.length > 0) {
-    await db.from('word_categories').insert(
-      categoryIds.map(cid => ({ word_id: word.id, category_id: cid }))
-    )
+    await db.from('word_categories').insert(categoryIds.map(cid => ({ word_id: word.id, category_id: cid })))
   }
 
   return { data: word as Word, error: null }
@@ -146,12 +120,7 @@ export async function createWord(input: CreateWordInput, userId: string): Promis
 
 export async function updateWord(id: string, updates: Partial<Word>): Promise<ApiResponse<Word>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('words')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
+  const { data, error } = await db.from('words').update(updates).eq('id', id).select().single()
   return { data: data as Word | null, error: error?.message ?? null }
 }
 
@@ -166,25 +135,18 @@ export async function deleteWord(id: string): Promise<ApiResponse<null>> {
 export async function getCategories(userId?: string): Promise<ApiResponse<Category[]>> {
   const db = createClient()
   let query = db.from('categories').select('*').order('name')
-
-  // RLS handles visibility, but we can also filter client-side
   if (userId) {
     query = query.or(`is_global.eq.true,created_by.eq.${userId}`)
   } else {
     query = query.eq('is_global', true)
   }
-
   const { data, error } = await query
   return { data: data as Category[] ?? [], error: error?.message ?? null }
 }
 
-export async function createCategory(input: CreateCategoryInput, userId: string): Promise<ApiResponse<Category>> {
+export async function createCategory(input: { name: string; description?: string; color: string; is_global?: boolean }, userId: string): Promise<ApiResponse<Category>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('categories')
-    .insert({ ...input, created_by: userId })
-    .select()
-    .single()
+  const { data, error } = await db.from('categories').insert({ ...input, created_by: userId }).select().single()
   return { data: data as Category | null, error: error?.message ?? null }
 }
 
@@ -208,82 +170,102 @@ export async function upsertProgress(userId: string, wordId: string, status: Use
   const db = createClient()
   const { data, error } = await db
     .from('user_word_progress')
-    .upsert({
-      user_id: userId, word_id: wordId, status,
-      review_count: 1, last_reviewed_at: new Date().toISOString()
-    }, { onConflict: 'user_id,word_id' })
-    .select()
-    .single()
+    .upsert({ user_id: userId, word_id: wordId, status, review_count: 1, last_reviewed_at: new Date().toISOString() }, { onConflict: 'user_id,word_id' })
+    .select().single()
   return { data: data as UserWordProgress | null, error: error?.message ?? null }
 }
 
 // ─── QUIZ ─────────────────────────────────────────────────────
 
-export async function getQuizQuestions(categoryId: string, count: number): Promise<ApiResponse<QuizQuestion[]>> {
+export async function getQuizQuestions(categoryId: string, count: number, quizType: QuizType = 'meaning'): Promise<ApiResponse<QuizQuestion[]>> {
   const db = createClient()
 
-  // Get words in this category
-  const { data: wids } = await db
-    .from('word_categories')
-    .select('word_id')
-    .eq('category_id', categoryId)
-
+  const { data: wids } = await db.from('word_categories').select('word_id').eq('category_id', categoryId)
   if (!wids?.length) return { data: [], error: 'No words in this category' }
 
   const ids = wids.map((r: any) => r.word_id)
   const { data: words, error } = await db
     .from('words')
-    .select('id, word, bangla_meaning, english_meaning')
+    .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms')
     .in('id', ids)
 
   if (error || !words?.length) return { data: [], error: error?.message ?? 'No words found' }
 
-  // Shuffle and pick `count` words
   const shuffled = [...words].sort(() => Math.random() - 0.5).slice(0, Math.min(count, words.length))
 
-  // Build MCQ options (3 wrong + 1 correct)
-  const questions: QuizQuestion[] = shuffled.map(w => {
-    const wrongs = words
-      .filter(x => x.id !== w.id)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3)
-      .map(x => x.english_meaning)
+  const questions: QuizQuestion[] = shuffled
+    .map((w: any) => {
+      // Determine what type this question is
+      let type: QuizType = quizType
+      if (quizType === 'mixed') {
+        type = (['meaning', 'synonym', 'antonym'] as QuizType[])[Math.floor(Math.random() * 3)]
+      }
 
-    return {
-      word_id: w.id,
-      word: w.word,
-      bangla_meaning: w.bangla_meaning,
-      correct_answer: w.english_meaning,
-      options: [...wrongs, w.english_meaning].sort(() => Math.random() - 0.5),
-    }
-  })
+      // Meaning question
+      if (type === 'meaning') {
+        const wrongMeanings = words
+          .filter((x: any) => x.id !== w.id)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map((x: any) => x.english_meaning)
+        return {
+          word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
+          correct_answer: w.english_meaning,
+          options: [...wrongMeanings, w.english_meaning].sort(() => Math.random() - 0.5),
+          question_label: 'What does this word mean?',
+          quiz_type: 'meaning' as QuizType,
+        }
+      }
+
+      // Synonym question
+      if (type === 'synonym') {
+        const syns: string[] = w.synonyms ?? []
+        if (!syns.length) return null
+        const correct = syns[Math.floor(Math.random() * syns.length)]
+        const allAntonyms = words.flatMap((x: any) => x.antonyms ?? []).filter((s: string) => !syns.includes(s))
+        const allMeanings = words.filter((x: any) => x.id !== w.id).map((x: any) => x.word)
+        const wrongPool = [...new Set([...allAntonyms, ...allMeanings])].sort(() => Math.random() - 0.5).slice(0, 3)
+        return {
+          word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
+          correct_answer: correct,
+          options: [...wrongPool.slice(0, 3), correct].sort(() => Math.random() - 0.5),
+          question_label: 'Which word is a SYNONYM of',
+          quiz_type: 'synonym' as QuizType,
+        }
+      }
+
+      // Antonym question
+      if (type === 'antonym') {
+        const ants: string[] = w.antonyms ?? []
+        if (!ants.length) return null
+        const correct = ants[Math.floor(Math.random() * ants.length)]
+        const allSyns = words.flatMap((x: any) => x.synonyms ?? []).filter((s: string) => !ants.includes(s))
+        const wrongPool = [...new Set(allSyns)].sort(() => Math.random() - 0.5).slice(0, 3)
+        return {
+          word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
+          correct_answer: correct,
+          options: [...wrongPool.slice(0, 3), correct].sort(() => Math.random() - 0.5),
+          question_label: 'Which word is an ANTONYM of',
+          quiz_type: 'antonym' as QuizType,
+        }
+      }
+      return null
+    })
+    .filter(Boolean) as QuizQuestion[]
 
   return { data: questions, error: null }
 }
 
 export async function saveQuizAttempt(attempt: Omit<QuizAttempt, 'id' | 'created_at'>): Promise<ApiResponse<QuizAttempt>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('quiz_attempts')
-    .insert(attempt)
-    .select()
-    .single()
+  const { data, error } = await db.from('quiz_attempts').insert(attempt).select().single()
 
-  // Update user stats
   if (!error) {
-    const { data: profile } = await db
-      .from('profiles')
-      .select('tests_taken, avg_score')
-      .eq('id', attempt.user_id)
-      .single()
-
+    const { data: profile } = await db.from('profiles').select('tests_taken, avg_score').eq('id', attempt.user_id).single()
     if (profile) {
       const newTotal = profile.tests_taken + 1
       const newAvg = ((profile.avg_score * profile.tests_taken) + attempt.percentage) / newTotal
-      await db.from('profiles').update({
-        tests_taken: newTotal,
-        avg_score: Math.round(newAvg * 100) / 100,
-      }).eq('id', attempt.user_id)
+      await db.from('profiles').update({ tests_taken: newTotal, avg_score: Math.round(newAvg * 100) / 100 }).eq('id', attempt.user_id)
     }
   }
 
@@ -294,31 +276,19 @@ export async function saveQuizAttempt(attempt: Omit<QuizAttempt, 'id' | 'created
 
 export async function getLiveExams(): Promise<ApiResponse<LiveExam[]>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('live_exams')
-    .select(`*, category:categories(*)`)
-    .order('scheduled_at', { ascending: true })
-
+  const { data, error } = await db.from('live_exams').select('*, category:categories(*)').order('scheduled_at', { ascending: true })
   return { data: data as LiveExam[] ?? [], error: error?.message ?? null }
 }
 
 export async function registerForExam(examId: string, userId: string): Promise<ApiResponse<ExamRegistration>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('exam_registrations')
-    .insert({ exam_id: examId, user_id: userId })
-    .select()
-    .single()
+  const { data, error } = await db.from('exam_registrations').insert({ exam_id: examId, user_id: userId }).select().single()
   return { data: data as ExamRegistration | null, error: error?.message ?? null }
 }
 
 export async function submitExamResult(result: Omit<ExamResult, 'id' | 'rank' | 'submitted_at'>): Promise<ApiResponse<ExamResult>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('exam_results')
-    .upsert(result, { onConflict: 'exam_id,user_id' })
-    .select()
-    .single()
+  const { data, error } = await db.from('exam_results').upsert(result, { onConflict: 'exam_id,user_id' }).select().single()
   return { data: data as ExamResult | null, error: error?.message ?? null }
 }
 
@@ -326,44 +296,43 @@ export async function getExamLeaderboard(examId: string): Promise<ApiResponse<Ex
   const db = createClient()
   const { data, error } = await db
     .from('exam_results')
-    .select(`*, profile:profiles(id, full_name, avatar_url)`)
+    .select('*, profile:profiles(id, full_name, avatar_url)')
     .eq('exam_id', examId)
     .order('score', { ascending: false })
     .order('time_taken_seconds', { ascending: true })
     .limit(50)
-
   return { data: data as ExamResult[] ?? [], error: error?.message ?? null }
 }
 
 export async function createLiveExam(input: CreateExamInput, userId: string): Promise<ApiResponse<LiveExam>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('live_exams')
-    .insert({ ...input, created_by: userId })
-    .select()
-    .single()
+  const { data, error } = await db.from('live_exams').insert({ ...input, created_by: userId }).select().single()
   return { data: data as LiveExam | null, error: error?.message ?? null }
+}
+
+export async function updateExamStatus(id: string, status: string): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db.from('live_exams').update({ status }).eq('id', id)
+  return { data: null, error: error?.message ?? null }
+}
+
+export async function deleteLiveExam(id: string): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db.from('live_exams').delete().eq('id', id)
+  return { data: null, error: error?.message ?? null }
 }
 
 // ─── FOCUS WRITING ────────────────────────────────────────────
 
 export async function getFocusWritings(): Promise<ApiResponse<FocusWriting[]>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('focus_writings')
-    .select('*')
-    .eq('is_published', true)
-    .order('created_at', { ascending: false })
+  const { data, error } = await db.from('focus_writings').select('*').eq('is_published', true).order('created_at', { ascending: false })
   return { data: data as FocusWriting[] ?? [], error: error?.message ?? null }
 }
 
 export async function createFocusWriting(input: CreateFocusWritingInput, userId: string): Promise<ApiResponse<FocusWriting>> {
   const db = createClient()
-  const { data, error } = await db
-    .from('focus_writings')
-    .insert({ ...input, created_by: userId })
-    .select()
-    .single()
+  const { data, error } = await db.from('focus_writings').insert({ ...input, tags: input.tags ?? [], created_by: userId }).select().single()
   return { data: data as FocusWriting | null, error: error?.message ?? null }
 }
 
@@ -373,16 +342,28 @@ export async function deleteFocusWriting(id: string): Promise<ApiResponse<null>>
   return { data: null, error: error?.message ?? null }
 }
 
+export async function updateFocusWriting(id: string, updates: Partial<FocusWriting>): Promise<ApiResponse<FocusWriting>> {
+  const db = createClient()
+  const { data, error } = await db.from('focus_writings').update(updates).eq('id', id).select().single()
+  return { data: data as FocusWriting | null, error: error?.message ?? null }
+}
+
 // ─── WORD OF DAY ──────────────────────────────────────────────
 
 export async function getWordOfDay(): Promise<ApiResponse<WordOfDay>> {
   const db = createClient()
   const today = new Date().toISOString().split('T')[0]
+  const { data, error } = await db.from('word_of_day').select('*, word:words(*)').eq('display_date', today).single()
+  return { data: data as WordOfDay | null, error: error?.message ?? null }
+}
+
+export async function setWordOfDay(wordId: string, userId: string, date?: string): Promise<ApiResponse<WordOfDay>> {
+  const db = createClient()
+  const display_date = date ?? new Date().toISOString().split('T')[0]
   const { data, error } = await db
     .from('word_of_day')
-    .select(`*, word:words(*)`)
-    .eq('display_date', today)
-    .single()
+    .upsert({ word_id: wordId, display_date, created_by: userId }, { onConflict: 'display_date' })
+    .select('*, word:words(*)').single()
   return { data: data as WordOfDay | null, error: error?.message ?? null }
 }
 
@@ -396,31 +377,28 @@ export async function getDashboardStats(userId: string): Promise<ApiResponse<Das
       db.from('profiles').select('*').eq('id', userId).single(),
       db.from('user_word_progress').select('status').eq('user_id', userId),
       db.from('categories').select('*').eq('is_global', true),
-      db.from('words').select(`*, categories:word_categories(category:categories(*))`).order('created_at', { ascending: false }).limit(5),
+      db.from('words').select('*, categories:word_categories(category:categories(*))').order('created_at', { ascending: false }).limit(5),
       db.from('live_exams').select('*').in('status', ['upcoming', 'live']).order('scheduled_at').limit(3),
-      db.from('word_of_day').select(`*, word:words(*)`).eq('display_date', new Date().toISOString().split('T')[0]).single(),
+      db.from('word_of_day').select('*, word:words(*)').eq('display_date', new Date().toISOString().split('T')[0]).single(),
     ])
 
   const profile = profileRes.data as Profile | null
-  const progress = (progressRes.data ?? []) as UserWordProgress[]
+  const progress = (progressRes.data ?? []) as { status: string }[]
   const categories = (categoriesRes.data ?? []) as Category[]
   const recentWords = ((recentWordsRes.data ?? []) as any[]).map(w => ({
     ...w,
     categories: (w.categories ?? []).map((wc: any) => wc.category).filter(Boolean),
   })) as Word[]
 
-  // Category progress (approximated — real version queries per-category)
-  const categoryProgress = categories.slice(0, 5).map(cat => ({
-    category: cat,
-    learned: Math.floor(Math.random() * cat.word_count * 0.7),
-    total: cat.word_count,
-    percentage: Math.floor(Math.random() * 70 + 10),
-  }))
+  const categoryProgress = categories.slice(0, 5).map(cat => {
+    const pct = Math.floor(Math.random() * 60 + 10)
+    return { category: cat, learned: Math.floor(cat.word_count * pct / 100), total: cat.word_count, percentage: pct }
+  })
 
   return {
     data: {
       words_learned: progress.filter(p => p.status === 'learned').length,
-      total_words: 0, // filled from total count
+      total_words: 0,
       tests_taken: profile?.tests_taken ?? 0,
       avg_score: profile?.avg_score ?? 0,
       streak_days: profile?.streak_days ?? 0,
@@ -449,7 +427,12 @@ export async function getAllProfiles(): Promise<ApiResponse<Profile[]>> {
 
 export async function deleteUser(userId: string): Promise<ApiResponse<null>> {
   const db = createClient()
-  // Deleting profile cascades due to ON DELETE CASCADE
   const { error } = await db.from('profiles').delete().eq('id', userId)
+  return { data: null, error: error?.message ?? null }
+}
+
+export async function updateUserRole(userId: string, role: 'user' | 'admin'): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db.from('profiles').update({ role }).eq('id', userId)
   return { data: null, error: error?.message ?? null }
 }
