@@ -1,5 +1,5 @@
 /**
- * VocabMaster Database Service Layer
+ * thevocabmaster Database Service Layer
  *
  * ⚠️  MIGRATION NOTE:
  * All database interactions go through this file ONLY.
