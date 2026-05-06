@@ -39,7 +39,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Mobile top bar */}
+
+          {/* Mobile top bar — hidden on md+ screens */}
           <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-[var(--sidebar-bg)] border-b border-[var(--border)] flex-shrink-0">
             <button
               onClick={() => setMobileOpen(true)}
@@ -56,9 +57,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           </header>
+
+          {/* Main scroll container — this is the ONLY scroll parent */}
           <main className="flex-1 overflow-y-auto">
             {children}
           </main>
+
         </div>
         <Toaster />
       </div>
