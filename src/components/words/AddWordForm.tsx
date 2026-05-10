@@ -8,7 +8,7 @@ import { createWord } from '@/lib/db'
 import { generateWordData } from '@/lib/gemini'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/components/ui/Toast'
-import { Sparkles, PlusCircle, Loader2 } from 'lucide-react'
+import { Sparkles, PlusCircle } from 'lucide-react'
 import type { Category, PartOfSpeech } from '@/types'
 
 interface AddWordFormProps {
@@ -17,49 +17,52 @@ interface AddWordFormProps {
 }
 
 const POS_OPTIONS = [
-  { value: '', label: 'Select part of speech' },
-  { value: 'noun', label: 'Noun (n.)' },
-  { value: 'verb', label: 'Verb (v.)' },
-  { value: 'adjective', label: 'Adjective (adj.)' },
-  { value: 'adverb', label: 'Adverb (adv.)' },
-  { value: 'preposition', label: 'Preposition (prep.)' },
-  { value: 'conjunction', label: 'Conjunction (conj.)' },
+  { value: '',             label: 'Select part of speech' },
+  { value: 'noun',         label: 'Noun (n.)'        },
+  { value: 'verb',         label: 'Verb (v.)'        },
+  { value: 'adjective',    label: 'Adjective (adj.)' },
+  { value: 'adverb',       label: 'Adverb (adv.)'   },
+  { value: 'preposition',  label: 'Preposition (prep.)' },
+  { value: 'conjunction',  label: 'Conjunction (conj.)' },
   { value: 'interjection', label: 'Interjection (int.)' },
-  { value: 'pronoun', label: 'Pronoun (pron.)' },
+  { value: 'pronoun',      label: 'Pronoun (pron.)'  },
 ]
 
 export default function AddWordForm({ categories, onSuccess }: AddWordFormProps) {
-  const { profile } = useAuthStore()
+  const { profile }    = useAuthStore()
   const { add: toast } = useToast()
+  const isAdmin        = profile?.role === 'admin'
 
-  const [word, setWord] = useState('')
-  const [form, setForm] = useState({
+  const [word,     setWord]     = useState('')
+  const [form,     setForm]     = useState({
     bangla_meaning: '', english_meaning: '', synonyms: '',
     antonyms: '', example: '', part_of_speech: '', pronunciation: '',
   })
   const [selectedCats, setSelectedCats] = useState<string[]>([])
-  const [catMode, setCatMode] = useState<'existing' | 'new'>('existing')
-  const [newCatName, setNewCatName] = useState('')
-  const [newCatColor, setNewCatColor] = useState('#6366f1')
-  const [loading, setLoading] = useState(false)
+  const [catMode,      setCatMode]      = useState<'existing' | 'new'>('existing')
+  const [newCatName,   setNewCatName]   = useState('')
+  const [newCatColor,  setNewCatColor]  = useState('#6366f1')
+  const [saving,   setSaving]   = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors,   setErrors]   = useState<Record<string, string>>({})
 
+  // ── AI fill (admin only) ──────────────────────────────────
   const handleGenerateAI = async () => {
+    if (!isAdmin) return
     if (!word.trim()) { toast('Enter a word first', 'error'); return }
     setAiLoading(true)
     try {
-      const generated = await generateWordData(word.trim())
+      const gen = await generateWordData(word.trim())
       setForm({
-        bangla_meaning: generated.bangla_meaning,
-        english_meaning: generated.english_meaning,
-        synonyms: generated.synonyms.join(', '),
-        antonyms: generated.antonyms.join(', '),
-        example: generated.example,
-        part_of_speech: generated.part_of_speech,
-        pronunciation: generated.pronunciation ?? '',
+        bangla_meaning:  gen.bangla_meaning,
+        english_meaning: gen.english_meaning,
+        synonyms:        gen.synonyms.join(', '),
+        antonyms:        gen.antonyms.join(', '),
+        example:         gen.example,
+        part_of_speech:  gen.part_of_speech,
+        pronunciation:   gen.pronunciation ?? '',
       })
-      toast('AI generated word data! Review and save.', 'success')
+      toast('AI filled all fields! Review and save.', 'success')
     } catch (err: any) {
       toast(err.message ?? 'AI generation failed', 'error')
     }
@@ -68,35 +71,35 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!word.trim()) e.word = 'Word is required'
-    if (!form.english_meaning.trim()) e.english_meaning = 'English meaning is required'
+    if (!word.trim())               e.word    = 'Word is required'
+    if (!form.english_meaning.trim()) e.meaning = 'English meaning is required'
     if (catMode === 'existing' && selectedCats.length === 0) e.cats = 'Select at least one category'
-    if (catMode === 'new' && !newCatName.trim()) e.cats = 'New category name is required'
+    if (catMode === 'new'      && !newCatName.trim())        e.cats = 'Category name is required'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   const handleSave = async () => {
     if (!validate() || !profile) return
-    setLoading(true)
+    setSaving(true)
     const { error } = await createWord({
-      word: word.trim(),
-      bangla_meaning: form.bangla_meaning || undefined,
+      word:            word.trim(),
+      bangla_meaning:  form.bangla_meaning  || undefined,
       english_meaning: form.english_meaning,
-      synonyms: form.synonyms.split(',').map(s => s.trim()).filter(Boolean),
-      antonyms: form.antonyms.split(',').map(s => s.trim()).filter(Boolean),
-      example: form.example || undefined,
-      part_of_speech: (form.part_of_speech as PartOfSpeech) || undefined,
-      pronunciation: form.pronunciation || undefined,
-      category_ids: catMode === 'existing' ? selectedCats : [],
-      new_category_name: catMode === 'new' ? newCatName : undefined,
-      new_category_color: catMode === 'new' ? newCatColor : undefined,
+      synonyms:  form.synonyms.split(',').map(s => s.trim()).filter(Boolean),
+      antonyms:  form.antonyms.split(',').map(s => s.trim()).filter(Boolean),
+      example:         form.example         || undefined,
+      part_of_speech:  (form.part_of_speech as PartOfSpeech) || undefined,
+      pronunciation:   form.pronunciation   || undefined,
+      category_ids:    catMode === 'existing' ? selectedCats : [],
+      new_category_name:  catMode === 'new' ? newCatName   : undefined,
+      new_category_color: catMode === 'new' ? newCatColor  : undefined,
     }, profile.id)
 
-    setLoading(false)
+    setSaving(false)
     if (error) { toast(error, 'error'); return }
 
-    toast('Word saved successfully! 🎉', 'success')
+    toast('Word saved! 🎉', 'success')
     setWord('')
     setForm({ bangla_meaning: '', english_meaning: '', synonyms: '', antonyms: '', example: '', part_of_speech: '', pronunciation: '' })
     setSelectedCats([])
@@ -104,13 +107,13 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
     onSuccess?.()
   }
 
-  const toggleCat = (id: string) => {
+  const toggleCat = (id: string) =>
     setSelectedCats(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
-  }
 
   return (
-    <div className="space-y-6">
-      {/* Word + AI button */}
+    <div className="space-y-5">
+
+      {/* ── Word input + AI button ── */}
       <div>
         <div className="flex gap-3 items-end">
           <div className="flex-1">
@@ -122,34 +125,43 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
               error={errors.word}
             />
           </div>
-          <Button
-            variant="outline"
-            onClick={handleGenerateAI}
-            loading={aiLoading}
-            className="flex-shrink-0 h-[42px]"
-            title="Generate all fields using Gemini AI"
-          >
-            <Sparkles className="w-4 h-4" />
-            {aiLoading ? 'Generating...' : 'AI Fill'}
-          </Button>
+
+          {/* AI Fill — admin only */}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={handleGenerateAI}
+              loading={aiLoading}
+              className="flex-shrink-0 h-[42px]"
+              title="Auto-fill all fields using Gemini AI (Admin only)"
+            >
+              <Sparkles className="w-4 h-4" />
+              {aiLoading ? 'Generating…' : 'AI Fill'}
+            </Button>
+          )}
         </div>
-        {!aiLoading && word && (
-          <p className="text-[11px] text-[#5a5a72] mt-1.5">
-            💡 Click <strong>AI Fill</strong> to auto-generate all fields using Gemini AI, then review before saving.
+
+        {/* AI hint text — admin only */}
+        {isAdmin && word && !aiLoading && (
+          <p className="text-[11px] mt-1.5" style={{ color: 'var(--text3)' }}>
+            💡 Click <strong>AI Fill</strong> to auto-generate all fields using Gemini AI.
           </p>
+        )}
+
+        {/* AI loading banner */}
+        {aiLoading && (
+          <div className="mt-2 flex items-center gap-3 p-3 rounded-xl border"
+            style={{ background: 'var(--accent)' + '12', borderColor: 'var(--accent)' + '30' }}>
+            <Sparkles className="w-4 h-4 animate-pulse" style={{ color: 'var(--accent2)' }} />
+            <p className="text-sm" style={{ color: 'var(--accent2)' }}>
+              Gemini AI is generating data for `<strong>{word}</strong>`
+            </p>
+          </div>
         )}
       </div>
 
-      {/* AI loading state */}
-      {aiLoading && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-[#7c6af7]/8 border border-[#7c6af7]/20">
-          <Loader2 className="w-4 h-4 animate-spin text-[#a78bfa]" />
-          <p className="text-sm text-[#a78bfa]">Gemini AI is generating word data for "{word}"...</p>
-        </div>
-      )}
-
-      {/* Form fields */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* ── Form fields ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Bangla Meaning"
           placeholder="বাংলা অর্থ"
@@ -162,13 +174,13 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
           value={form.pronunciation}
           onChange={e => setForm({ ...form, pronunciation: e.target.value })}
         />
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <Input
             label="English Meaning *"
             placeholder="Clear definition in English"
             value={form.english_meaning}
             onChange={e => setForm({ ...form, english_meaning: e.target.value })}
-            error={errors.english_meaning}
+            error={errors.meaning}
           />
         </div>
         <Input
@@ -183,15 +195,15 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
           value={form.antonyms}
           onChange={e => setForm({ ...form, antonyms: e.target.value })}
         />
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <Textarea
             label="Example Sentence"
-            placeholder="Use the word in a natural sentence..."
+            placeholder="Use the word in a natural sentence…"
             value={form.example}
             onChange={e => setForm({ ...form, example: e.target.value })}
           />
         </div>
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <Select
             label="Part of Speech"
             value={form.part_of_speech}
@@ -201,14 +213,24 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
         </div>
       </div>
 
-      {/* Category section */}
+      {/* ── Category picker ── */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-[#9090a8] mb-3">Add to Category</p>
+        <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text2)' }}>
+          Add to Category
+        </p>
         <div className="flex gap-2 mb-3">
-          <Button variant={catMode === 'existing' ? 'primary' : 'secondary'} size="sm" onClick={() => setCatMode('existing')}>
-            Existing Category
+          <Button
+            variant={catMode === 'existing' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setCatMode('existing')}
+          >
+            Existing
           </Button>
-          <Button variant={catMode === 'new' ? 'primary' : 'secondary'} size="sm" onClick={() => setCatMode('new')}>
+          <Button
+            variant={catMode === 'new' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setCatMode('new')}
+          >
             + Create New
           </Button>
         </div>
@@ -219,37 +241,49 @@ export default function AddWordForm({ categories, onSuccess }: AddWordFormProps)
               <button
                 key={cat.id}
                 onClick={() => toggleCat(cat.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                  selectedCats.includes(cat.id)
-                    ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
-                    : 'bg-[#1a1a26] border-white/10 text-[#9090a8] hover:border-white/20'
-                }`}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                style={{
+                  background:   selectedCats.includes(cat.id) ? 'var(--accent)'   : 'var(--bg3)',
+                  borderColor:  selectedCats.includes(cat.id) ? 'var(--accent)'   : 'var(--border2)',
+                  color:        selectedCats.includes(cat.id) ? '#fff'            : 'var(--text2)',
+                }}
               >
                 {cat.name}
               </button>
             ))}
             {categories.length === 0 && (
-              <p className="text-xs text-[#5a5a72]">No categories yet. Create one!</p>
+              <p className="text-xs" style={{ color: 'var(--text3)' }}>No categories yet. Create one!</p>
             )}
           </div>
         ) : (
           <div className="flex gap-3 items-end">
             <div className="flex-1">
-              <Input label="Category Name" placeholder="e.g. My Special Words" value={newCatName} onChange={e => setNewCatName(e.target.value)} />
+              <Input
+                label="Category Name"
+                placeholder="e.g. My Special Words"
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+              />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#9090a8] mb-1.5">Color</p>
-              <input type="color" value={newCatColor} onChange={e => setNewCatColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-[#1a1a26] p-1" />
+              <p className="text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text2)' }}>
+                Color
+              </p>
+              <input
+                type="color"
+                value={newCatColor}
+                onChange={e => setNewCatColor(e.target.value)}
+                className="w-10 h-10 rounded-lg cursor-pointer p-1 border"
+                style={{ background: 'var(--bg3)', borderColor: 'var(--border2)' }}
+              />
             </div>
           </div>
         )}
         {errors.cats && <p className="text-xs text-red-400 mt-1.5">{errors.cats}</p>}
       </div>
 
-      <Button onClick={handleSave} loading={loading} className="w-full" size="lg">
-        <PlusCircle className="w-4 h-4" />
-        Save Word
+      <Button onClick={handleSave} loading={saving} className="w-full" size="lg">
+        <PlusCircle className="w-4 h-4" /> Save Word
       </Button>
     </div>
   )
