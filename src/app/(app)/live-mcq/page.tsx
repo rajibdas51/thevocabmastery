@@ -16,7 +16,7 @@ import type { LiveExam, ExamResult, QuizQuestion } from '@/types'
 import { cn } from '@/lib/utils'
 import { Trophy, Clock, ArrowLeft, Zap, CheckCircle2, XCircle } from 'lucide-react'
 
-type View = 'list' | 'exam' | 'leaderboard'
+type View = 'list' | 'exam' | 'leaderboard';
 
 export default function LiveMCQPage() {
   const { profile }    = useAuthStore()
