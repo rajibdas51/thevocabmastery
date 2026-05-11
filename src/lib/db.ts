@@ -177,33 +177,41 @@ export async function upsertProgress(userId: string, wordId: string, status: Use
 
 // ─── QUIZ ─────────────────────────────────────────────────────
 
-export async function getQuizQuestions(categoryId: string, count: number, quizType: QuizType = 'meaning'): Promise<ApiResponse<QuizQuestion[]>> {
+export async function getQuizQuestions(
+  categoryId: string,
+  count: number,
+  quizType: QuizType = 'meaning_en'
+): Promise<ApiResponse<QuizQuestion[]>> {
   const db = createClient()
 
-  const { data: wids } = await db.from('word_categories').select('word_id').eq('category_id', categoryId)
+  const { data: wids } = await db
+    .from('word_categories').select('word_id').eq('category_id', categoryId)
   if (!wids?.length) return { data: [], error: 'No words in this category' }
 
   const ids = wids.map((r: any) => r.word_id)
   const { data: words, error } = await db
     .from('words')
-    .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms')
+    .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms, example')
     .in('id', ids)
 
   if (error || !words?.length) return { data: [], error: error?.message ?? 'No words found' }
 
+  // For mixed, pick from all except fill_blank (fill_blank needs example sentences)
+  const MIXED_POOL: QuizType[] = ['meaning_en', 'meaning_bn', 'synonym', 'antonym']
+
   const shuffled = [...words].sort(() => Math.random() - 0.5).slice(0, Math.min(count, words.length))
 
   const questions: QuizQuestion[] = shuffled
-    .map((w: any) => {
-      // Determine what type this question is
+    .map((w: any): QuizQuestion | null => {
       let type: QuizType = quizType
       if (quizType === 'mixed') {
-        type = (['meaning', 'synonym', 'antonym'] as QuizType[])[Math.floor(Math.random() * 3)]
+        type = MIXED_POOL[Math.floor(Math.random() * MIXED_POOL.length)]
       }
 
-      // Meaning question
-      if (type === 'meaning') {
-        const wrongMeanings = words
+      // ── MEANING (English) ──────────────────────────────────
+      // Show English word → pick correct English meaning from 4 options
+      if (type === 'meaning_en') {
+        const wrongs = words
           .filter((x: any) => x.id !== w.id)
           .sort(() => Math.random() - 0.5)
           .slice(0, 3)
@@ -211,47 +219,101 @@ export async function getQuizQuestions(categoryId: string, count: number, quizTy
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: w.english_meaning,
-          options: [...wrongMeanings, w.english_meaning].sort(() => Math.random() - 0.5),
-          question_label: 'What does this word mean?',
-          quiz_type: 'meaning' as QuizType,
+          options: [...wrongs, w.english_meaning].sort(() => Math.random() - 0.5),
+          question_label: 'What is the English meaning of',
+          quiz_type: 'meaning_en',
         }
       }
 
-      // Synonym question
+      // ── MEANING (Bangla) ───────────────────────────────────
+      // Show English word → pick correct Bangla meaning from 4 options
+      if (type === 'meaning_bn') {
+        if (!w.bangla_meaning) return null
+        // Need other words that also have bangla meanings for wrong options
+        const withBangla = words.filter((x: any) => x.id !== w.id && x.bangla_meaning)
+        if (withBangla.length < 3) return null
+        const wrongs = withBangla
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map((x: any) => x.bangla_meaning as string)
+        return {
+          word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
+          correct_answer: w.bangla_meaning,
+          options: [...wrongs, w.bangla_meaning].sort(() => Math.random() - 0.5),
+          question_label: 'এই ইংরেজি শব্দের বাংলা অর্থ কী?',
+          quiz_type: 'meaning_bn',
+        }
+      }
+
+      // ── SYNONYM ────────────────────────────────────────────
       if (type === 'synonym') {
         const syns: string[] = w.synonyms ?? []
         if (!syns.length) return null
         const correct = syns[Math.floor(Math.random() * syns.length)]
-        const allAntonyms = words.flatMap((x: any) => x.antonyms ?? []).filter((s: string) => !syns.includes(s))
-        const allMeanings = words.filter((x: any) => x.id !== w.id).map((x: any) => x.word)
-        const wrongPool = [...new Set([...allAntonyms, ...allMeanings])].sort(() => Math.random() - 0.5).slice(0, 3)
+        const wrongPool = words
+          .filter((x: any) => x.id !== w.id)
+          .flatMap((x: any) => x.antonyms ?? [])
+          .filter((s: string) => !syns.includes(s))
+        const wrongs = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3)
+        if (wrongs.length < 3) return null
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: correct,
-          options: [...wrongPool.slice(0, 3), correct].sort(() => Math.random() - 0.5),
+          options: [...wrongs, correct].sort(() => Math.random() - 0.5),
           question_label: 'Which word is a SYNONYM of',
-          quiz_type: 'synonym' as QuizType,
+          quiz_type: 'synonym',
         }
       }
 
-      // Antonym question
+      // ── ANTONYM ────────────────────────────────────────────
       if (type === 'antonym') {
         const ants: string[] = w.antonyms ?? []
         if (!ants.length) return null
         const correct = ants[Math.floor(Math.random() * ants.length)]
-        const allSyns = words.flatMap((x: any) => x.synonyms ?? []).filter((s: string) => !ants.includes(s))
-        const wrongPool = [...new Set(allSyns)].sort(() => Math.random() - 0.5).slice(0, 3)
+        const wrongPool = words
+          .filter((x: any) => x.id !== w.id)
+          .flatMap((x: any) => x.synonyms ?? [])
+          .filter((s: string) => !ants.includes(s))
+        const wrongs = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3)
+        if (wrongs.length < 3) return null
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: correct,
-          options: [...wrongPool.slice(0, 3), correct].sort(() => Math.random() - 0.5),
+          options: [...wrongs, correct].sort(() => Math.random() - 0.5),
           question_label: 'Which word is an ANTONYM of',
-          quiz_type: 'antonym' as QuizType,
+          quiz_type: 'antonym',
         }
       }
+
+      // ── FILL IN THE BLANK ──────────────────────────────────
+      if (type === 'fill_blank') {
+        if (!w.example) return null
+        // Replace the word in the example with ___
+        const regex = new RegExp(`\\b${w.word}\\b`, 'i')
+        if (!regex.test(w.example)) return null
+        const sentence = w.example.replace(regex, '___')
+        const wrongWords = words
+          .filter((x: any) => x.id !== w.id)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map((x: any) => x.word)
+        return {
+          word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
+          correct_answer: w.word,
+          options: [...wrongWords, w.word].sort(() => Math.random() - 0.5),
+          question_label: 'Fill in the blank with the correct word',
+          quiz_type: 'fill_blank',
+          sentence,
+        }
+      }
+
       return null
     })
     .filter(Boolean) as QuizQuestion[]
+
+  if (!questions.length) {
+    return { data: [], error: 'Not enough word data for this quiz type. Try adding more synonyms/antonyms/examples.' }
+  }
 
   return { data: questions, error: null }
 }
@@ -435,4 +497,81 @@ export async function updateUserRole(userId: string, role: 'user' | 'admin'): Pr
   const db = createClient()
   const { error } = await db.from('profiles').update({ role }).eq('id', userId)
   return { data: null, error: error?.message ?? null }
+}
+
+// ─── Example sentence helpers for fill-in-the-blank ──────────
+
+/** Fetch words in a category that are missing example sentences */
+export async function getWordsMissingExamples(
+  categoryId: string,
+  limit = 50
+): Promise<ApiResponse<{ id: string; word: string; english_meaning: string; part_of_speech: string | null }[]>> {
+  const db = createClient()
+
+  const { data: wids } = await db
+    .from('word_categories').select('word_id').eq('category_id', categoryId)
+  if (!wids?.length) return { data: [], error: null }
+
+  const ids = wids.map((r: any) => r.word_id)
+  const { data, error } = await db
+    .from('words')
+    .select('id, word, english_meaning, part_of_speech')
+    .in('id', ids)
+    .or('example.is.null,example.eq.')   // null or empty string
+    .limit(limit)
+
+  return { data: data ?? [], error: error?.message ?? null }
+}
+
+/** Save a generated example sentence back to the word */
+export async function saveWordExample(
+  wordId: string,
+  example: string
+): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db
+    .from('words')
+    .update({ example: example.trim() })
+    .eq('id', wordId)
+  return { data: null, error: error?.message ?? null }
+}
+
+/** Bulk save examples: [{ id, example }] */
+export async function bulkSaveExamples(
+  updates: { id: string; example: string }[]
+): Promise<{ saved: number; failed: number }> {
+  const db = createClient()
+  let saved = 0, failed = 0
+
+  // Run in parallel batches of 5
+  const chunks = []
+  for (let i = 0; i < updates.length; i += 5) chunks.push(updates.slice(i, i + 5))
+
+  for (const chunk of chunks) {
+    await Promise.all(
+      chunk.map(async ({ id, example }) => {
+        const { error } = await db.from('words').update({ example }).eq('id', id)
+        if (error) failed++; else saved++
+      })
+    )
+  }
+  return { saved, failed }
+}
+
+/** Count how many words in a category have examples (for fill-blank eligibility) */
+export async function countWordsWithExamples(categoryId: string): Promise<number> {
+  const db = createClient()
+  const { data: wids } = await db
+    .from('word_categories').select('word_id').eq('category_id', categoryId)
+  if (!wids?.length) return 0
+
+  const ids = wids.map((r: any) => r.word_id)
+  const { count } = await db
+    .from('words')
+    .select('id', { count: 'exact', head: true })
+    .in('id', ids)
+    .not('example', 'is', null)
+    .not('example', 'eq', '')
+
+  return count ?? 0
 }

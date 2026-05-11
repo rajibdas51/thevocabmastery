@@ -13,9 +13,10 @@ import Select from '@/components/ui/Select'
 import Modal from '@/components/ui/Modal'
 import { formatDate, getInitials } from '@/lib/utils'
 import type { Profile, Word, LiveExam, Category } from '@/types'
-import { Users, BookOpen, Zap, Shield, Trash2, Plus, Star, ChevronDown } from 'lucide-react'
+import { Users, BookOpen, Zap, Shield, Trash2, Plus, Star, ChevronDown, Sparkles } from 'lucide-react'
+import GenerateExamplesPanel from '@/components/admin/GenerateExamplesPanel'
 
-type Tab = 'users' | 'words' | 'exams' | 'wotd'
+type Tab = 'users' | 'words' | 'exams' | 'wotd' | 'examples'
 
 export default function AdminPage() {
   const { profile } = useAuthStore()
@@ -133,14 +134,15 @@ export default function AdminPage() {
     { id: 'words', label: 'Words', icon: BookOpen, count: words.length },
     { id: 'exams', label: 'Live Exams', icon: Zap, count: exams.length },
     { id: 'wotd', label: 'Word of Day', icon: Star, count: null },
+    { id: 'examples', label: 'Generate Examples', icon: Sparkles, count: null },
   ]
 
   return (
     <div className="animate-fade-up">
       <PageHeader title="Admin Panel" subtitle="Manage users, content, and live exams" />
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[
             { label: 'Total Users', value: users.length, color: '#7c6af7' },
             { label: 'Total Words', value: words.length, color: '#22d3a0' },
@@ -292,6 +294,15 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+            </Card>
+          </div>
+        )}
+
+        {/* ── GENERATE EXAMPLES ── */}
+        {tab === 'examples' && (
+          <div className="max-w-2xl">
+            <Card className="p-6">
+              <GenerateExamplesPanel />
             </Card>
           </div>
         )}

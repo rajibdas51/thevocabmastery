@@ -137,3 +137,90 @@ export async function generateWordHint(word: string, meaning: string): Promise<s
   const prompt = `Give a single memorable mnemonic (1 sentence max) to remember that "${word}" means "${meaning}". Be creative and concise.`
   return callGemini(prompt)
 }
+
+// ─── Example Sentence Generation ─────────────────────────────
+// Used for fill-in-the-blank. Generated ONCE per word, saved to DB.
+
+export interface GeneratedExample {
+  example: string        // sentence with the word used naturally
+  verified: boolean      // true if the word literally appears in the sentence
+}
+
+export async function generateExampleSentence(
+  word: string,
+  meaning: string,
+  partOfSpeech?: string
+): Promise<GeneratedExample> {
+  const prompt = `Generate ONE natural example sentence for the English word "${word}" (${partOfSpeech ?? 'word'}) which means "${meaning}".
+
+Rules:
+- The sentence must contain the EXACT word "${word}" (same form, not a variation)
+- It should be exam-appropriate (BCS/GRE level)
+- Between 10–20 words
+- The word should appear mid-sentence so it can become a fill-in-the-blank
+
+Return ONLY a JSON object, no markdown:
+{"example": "Your sentence here."}`
+
+  const raw    = await callGemini(prompt)
+  const parsed = JSON.parse(extractJSON(raw)) as { example: string }
+  const example = (parsed.example ?? '').trim()
+
+  // Verify the word actually appears in the sentence
+  const regex   = new RegExp(`\\b${word}\\b`, 'i')
+  const verified = regex.test(example)
+
+  return { example, verified }
+}
+
+// ─── Batch example generation for multiple words ──────────────
+// Generates up to 5 words in one API call to save quota
+
+export interface WordForExample {
+  id: string
+  word: string
+  english_meaning: string
+  part_of_speech?: string | null
+}
+
+export interface BatchExampleResult {
+  word_id: string
+  word: string
+  example: string | null
+  error?: string
+}
+
+export async function generateExamplesBatch(
+  words: WordForExample[]
+): Promise<BatchExampleResult[]> {
+  const prompt = `Generate ONE natural example sentence for each English word below.
+Each sentence MUST contain the exact word shown.
+Sentences should be 10–20 words, exam-appropriate (BCS/GRE level).
+
+Words:
+${words.map((w, i) => `${i + 1}. "${w.word}" (${w.part_of_speech ?? 'word'}) — means: "${w.english_meaning}"`).join('\n')}
+
+Return ONLY a JSON array matching the order above, no markdown:
+[
+  {"word": "word1", "example": "sentence1"},
+  {"word": "word2", "example": "sentence2"}
+]`
+
+  const raw    = await callGemini(prompt)
+  const parsed = JSON.parse(extractJSON(raw)) as { word: string; example: string }[]
+
+  return words.map((w, i) => {
+    const res   = parsed[i]
+    const ex    = res?.example?.trim() ?? null
+    // Verify word appears
+    const regex = new RegExp(`\\b${w.word}\\b`, 'i')
+    if (ex && regex.test(ex)) {
+      return { word_id: w.id, word: w.word, example: ex }
+    }
+    // Word doesn't appear — try to splice it in as fallback
+    if (ex) {
+      return { word_id: w.id, word: w.word, example: ex, error: 'word may not appear verbatim' }
+    }
+    return { word_id: w.id, word: w.word, example: null, error: 'no example generated' }
+  })
+}
