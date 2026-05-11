@@ -96,7 +96,8 @@ export default function LiveMCQPage() {
         correct_answer: q.options?.find((o: any) => o.is_correct)?.text ?? '',
         options:        q.options?.map((o: any) => o.text) ?? [],
         question_label: 'What does this word mean?',
-        quiz_type:      'meaning' as const,
+        quiz_type: 'meaning_en' as const,
+        sentence: undefined,
       }))
     }
 
@@ -104,7 +105,7 @@ export default function LiveMCQPage() {
     if (qs.length === 0) {
       const catId = exam.category_id
       if (catId) {
-        const { data, error } = await getQuizQuestions(catId, exam.question_count, 'meaning')
+        const { data, error } = await getQuizQuestions(catId, exam.question_count, 'meaning_en')
         if (error || !data?.length) {
           toast('No words found for this exam\'s category. Ask admin to add words first.', 'error')
           setEntering(null); return
@@ -322,7 +323,7 @@ export default function LiveMCQPage() {
               Question {qIdx + 1} of {questions.length}
             </p>
             <h2 className="font-playfair text-3xl sm:text-4xl font-black text-[var(--text)]">
-              `{q?.word}`
+              "{q?.word}"
             </h2>
             {q?.bangla_meaning && (
               <p className="text-sm mt-1" style={{ color: 'var(--gold)' }}>{q.bangla_meaning}</p>

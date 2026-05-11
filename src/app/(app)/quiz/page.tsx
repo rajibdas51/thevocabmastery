@@ -12,6 +12,7 @@ import { formatTime, scoreColor, scoreLabel } from '@/lib/utils'
 import type { Category, QuizQuestion, QuizType } from '@/types'
 import { cn } from '@/lib/utils'
 import { Timer, RotateCcw, Home, CheckCircle2, XCircle } from 'lucide-react'
+import HintButton from '@/components/quiz/HintButton'
 
 type Step = 'setup' | 'quiz' | 'result'
 
@@ -298,15 +299,13 @@ export default function QuizPage() {
 
           {/* The word / sentence */}
           <h2 className="font-playfair text-3xl sm:text-4xl font-black" style={{ color: 'var(--text)' }}>
-            "{q?.word}"
+            `{q?.word} `
           </h2>
 
           {/* Sub-labels */}
-          {q?.bangla_meaning && !isBn && (
-            <p className="text-sm mt-1" style={{ color: 'var(--gold)' }}>{q.bangla_meaning}</p>
-          )}
-          {isBn && q?.bangla_meaning && (
-            <p className="text-xs mt-1 font-mono" style={{ color: 'var(--text3)' }}>Hint: {q.bangla_meaning}</p>
+          {/* Hint resets on each new question via key={current} */}
+          {q?.bangla_meaning && (
+            <HintButton key={current} hint={q.bangla_meaning} />
           )}
 
           {/* Options grid */}

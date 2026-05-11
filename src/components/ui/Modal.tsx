@@ -33,7 +33,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[400px]"
       style={{ background: 'rgba(0,0,0,0.65)' }}
       onClick={onClose}
     >

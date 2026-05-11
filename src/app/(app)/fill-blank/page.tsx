@@ -12,6 +12,7 @@ import { formatTime, scoreColor, scoreLabel } from '@/lib/utils'
 import type { Category, QuizQuestion } from '@/types'
 import { cn } from '@/lib/utils'
 import { Timer, RotateCcw, Home, CheckCircle2, XCircle, PenLine, Sparkles, AlertCircle } from 'lucide-react'
+import HintButton from '@/components/quiz/HintButton'
 import Link from 'next/link'
 
 type Step = 'setup' | 'quiz' | 'result'
@@ -388,11 +389,9 @@ export default function FillBlankPage() {
             {q?.sentence ? renderSentence(q.sentence) : '…'}
           </div>
 
-          {/* Bangla hint */}
+          {/* Hint resets on each new question via key={current} */}
           {q?.bangla_meaning && (
-            <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>
-              Hint: <span style={{ color: 'var(--gold)' }}>{q.bangla_meaning}</span>
-            </p>
+            <HintButton key={current} hint={q.bangla_meaning} />
           )}
 
           {/* Options */}
