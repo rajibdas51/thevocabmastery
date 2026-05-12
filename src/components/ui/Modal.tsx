@@ -41,7 +41,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
         className={cn(
           'relative w-full rounded-2xl shadow-2xl animate-fade-up',
           'bg-[var(--modal-bg)] border border-[var(--border2)]',
-          'max-h-[70vh] overflow-y-auto p-6 pt-15',
+          'max-h-[75vh] min-h-[65vh] overflow-y-auto p-6 pt-15',
           sizes[size]
         )}
         onClick={e => e.stopPropagation()}
