@@ -33,7 +33,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 pt-[400px]"
+      className="fixed inset-0 z-[200] flex items-top justify-center  p-4 pt-15"
       style={{ background: 'rgba(0,0,0,0.65)' }}
       onClick={onClose}
     >
@@ -41,7 +41,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
         className={cn(
           'relative w-full rounded-2xl shadow-2xl animate-fade-up',
           'bg-[var(--modal-bg)] border border-[var(--border2)]',
-          'max-h-[90vh] overflow-y-auto p-6',
+          'max-h-[70vh] overflow-y-auto p-6 pt-15',
           sizes[size]
         )}
         onClick={e => e.stopPropagation()}

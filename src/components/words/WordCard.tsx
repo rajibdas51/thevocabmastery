@@ -106,10 +106,11 @@ export default function WordCard({
 
   return (
     <>
-      {/* ── Tile ─────────────────────────────────────────── */}
+    <div className='max-h-[80vh] overflow-y-auto'>
+      {/*wordcard */}
       <div
         onClick={() => setOpen(true)}
-        className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)]"
+        className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)]"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -178,7 +179,12 @@ export default function WordCard({
       </div>
 
       {/* ── Detail Modal ─────────────────────────────────── */}
-      <Modal open={open} onClose={() => setOpen(false)} size="md">
+      <div className='relative'>
+        <div className='absolute top-2 right-2'>
+
+       
+        
+      <Modal open={open} onClose={() => setOpen(false)}  size="md">
         <div className="space-y-5">
           {/* Word header */}
           <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -289,6 +295,10 @@ export default function WordCard({
           )}
         </div>
       </Modal>
+ </div>
+      </div>
+      
+      </div>
     </>
   )
 }
