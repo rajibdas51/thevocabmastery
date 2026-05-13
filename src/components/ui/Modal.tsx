@@ -51,7 +51,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             <h2 className="font-playfair text-xl font-bold text-[var(--text)] flex-1 min-w-0">{title}</h2>
             <button
               onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--bg3)] hover:bg-[var(--border2)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--bg3)] hover:bg-[var(--border2)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
             >
               <X className="w-4 h-4" />
             </button>
