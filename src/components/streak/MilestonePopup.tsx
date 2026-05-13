@@ -14,11 +14,7 @@ export default function MilestonePopup() {
   const { pendingMilestones, dismissMilestone } = useStreakStore()
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setMounted(true))
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
-
+  useEffect(() => { setMounted(true) }, [])
   if (!mounted || pendingMilestones.length === 0) return null
 
   const key = pendingMilestones[0]
