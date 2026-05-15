@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth'
 import { useSidebarStore } from '@/store/sidebar'
+import { useStreakStore } from '@/store/streak'
 import Sidebar from './Sidebar'
 import ThemeProvider from './ThemeProvider'
 import { Toaster } from '@/components/ui/Toast'
+import MilestonePopup from '@/components/streak/MilestonePopup'
 import { Menu } from 'lucide-react'
 import type { Profile } from '@/types'
 
@@ -14,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { setProfile } = useAuthStore()
   const { setMobileOpen } = useSidebarStore()
+  const { hydrate } = useStreakStore()
 
   useEffect(() => {
     const supabase = createClient()
@@ -22,7 +25,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (data) setProfile(data as Profile)
+      if (data) {
+        setProfile(data as Profile)
+        // Hydrate streak store once profile is loaded
+        await hydrate(user.id)
+      }
     }
 
     loadProfile()
@@ -39,8 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-          {/* Mobile top bar — hidden on md+ screens */}
+          {/* Mobile top bar */}
           <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-[var(--sidebar-bg)] border-b border-[var(--border)] flex-shrink-0">
             <button
               onClick={() => setMobileOpen(true)}
@@ -57,14 +63,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           </header>
-
-          {/* Main scroll container — this is the ONLY scroll parent */}
           <main className="flex-1 overflow-y-auto">
             {children}
           </main>
-
         </div>
         <Toaster />
+        {/* Global milestone celebration popup */}
+        <MilestonePopup />
       </div>
     </ThemeProvider>
   )
