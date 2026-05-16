@@ -15,8 +15,9 @@ import { formatDate, getInitials } from '@/lib/utils'
 import type { Profile, Word, LiveExam, Category } from '@/types'
 import { Users, BookOpen, Zap, Shield, Trash2, Plus, Star, ChevronDown, Sparkles } from 'lucide-react'
 import GenerateExamplesPanel from '@/components/admin/GenerateExamplesPanel'
+import PointSystemConfigPanel from '@/components/admin/PointSystemConfig'
 
-type Tab = 'users' | 'words' | 'exams' | 'wotd' | 'examples'
+type Tab = 'users' | 'words' | 'exams' | 'wotd' | 'examples' | 'points'
 
 export default function AdminPage() {
   const { profile } = useAuthStore()
@@ -135,6 +136,7 @@ export default function AdminPage() {
     { id: 'exams', label: 'Live Exams', icon: Zap, count: exams.length },
     { id: 'wotd', label: 'Word of Day', icon: Star, count: null },
     { id: 'examples', label: 'Generate Examples', icon: Sparkles, count: null },
+    { id: 'points',   label: 'Points & Pricing',  icon: Zap,      count: null },
   ]
 
   return (
@@ -305,6 +307,11 @@ export default function AdminPage() {
               <GenerateExamplesPanel />
             </Card>
           </div>
+        )}
+
+        {/* ── POINTS & PRICING ── */}
+        {tab === 'points' && (
+          <PointSystemConfigPanel />
         )}
       </div>
 
