@@ -128,7 +128,7 @@ export default function OutOfPointsModal({ open, onClose, onAdWatched }: OutOfPo
                 Out of Points!
               </h2>
               <p className="text-sm mt-2" style={{ color: 'var(--text2)' }}>
-                You&apos;ve used all {streak?.max_points ?? 10} daily points.
+                You've used all {streak?.max_points ?? 10} daily points.
                 Come back tomorrow for a fresh start!
               </p>
             </div>
