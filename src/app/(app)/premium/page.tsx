@@ -73,7 +73,7 @@ function PremiumContent() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       // Redirect to SSLCommerz gateway
-      window.location.href = data.payment_url;
+      window.location.href = data.payment_url
     } catch (err: any) {
       toast(err.message ?? 'Payment initiation failed', 'error')
       setLoading(null)
