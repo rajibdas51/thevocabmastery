@@ -13,6 +13,10 @@ import type { Category, QuizQuestion, QuizType } from '@/types'
 import { cn } from '@/lib/utils'
 import { Timer, RotateCcw, Home, CheckCircle2, XCircle } from 'lucide-react'
 import HintButton from '@/components/quiz/HintButton'
+import OutOfPointsModal from '@/components/streak/OutOfPointsModal'
+import PointsBar from '@/components/streak/PointsBar'
+import { deductPoint, recordActivity, checkCanStartQuiz } from '@/lib/streak'
+import { useStreakStore } from '@/store/streak'
 
 type Step = 'setup' | 'quiz' | 'result'
 
@@ -65,6 +69,9 @@ export default function QuizPage() {
   const [showAns,   setShowAns]   = useState(false)
   const [loading,   setLoading]   = useState(false)
   const [elapsed,   setElapsed]   = useState(0)
+  const { refresh, queueMilestones } = useStreakStore()
+  const [outOfPoints, setOutOfPoints] = useState(false)
+  const [pointsOk,    setPointsOk]    = useState(true)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -84,6 +91,9 @@ export default function QuizPage() {
   }, [step])
 
   const startQuiz = async () => {
+    if (!profile) return
+    const check = await checkCanStartQuiz(profile.id)
+    if (!check.can_start) { setOutOfPoints(true); return }
     setLoading(true)
     const { data, error } = await getQuizQuestions(catId, parseInt(count), quizType)
     if (error || !data?.length) {
@@ -104,6 +114,12 @@ export default function QuizPage() {
     const q = questions[current]
     const isCorrect = selected === q.correct_answer
     const newAnswers = [...answers, { selected: selected!, correct: q.correct_answer, word: q.word, isCorrect }]
+    // Deduct point on wrong answer
+    if (!isCorrect && profile) {
+      const result = await deductPoint(profile.id)
+      if (result.out_of_points) { setOutOfPoints(true) }
+      refresh(profile.id)
+    }
     setAnswers(newAnswers)
     setSelected(null); setShowAns(false)
 
@@ -284,6 +300,7 @@ export default function QuizPage() {
             <Timer className="w-3.5 h-3.5" />
             <span className="font-mono">{formatTime(elapsed)}</span>
           </div>
+          <PointsBar compact />
           <Button variant="ghost" size="sm" onClick={() => setStep('setup')}>✕ Exit</Button>
         </div>
       </div>
@@ -364,6 +381,11 @@ export default function QuizPage() {
           <span style={{ color: 'var(--text3)' }}>{questions.length - current - 1} remaining</span>
         </div>
       </div>
+      <OutOfPointsModal
+        open={outOfPoints}
+        onClose={() => setOutOfPoints(false)}
+        onAdWatched={() => setOutOfPoints(false)}
+      />
     </div>
   )
 }

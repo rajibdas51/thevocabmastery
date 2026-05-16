@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { getWords, getCategories, deleteWord, upsertProgress } from '@/lib/db'
+import { recordActivity } from '@/lib/streak'
+import { useStreakStore } from '@/store/streak'
 import { useAuthStore } from '@/store/auth'
 import { useToast } from '@/components/ui/Toast'
 import WordCard from '@/components/words/WordCard'
@@ -12,6 +14,7 @@ import type { Word, Category } from '@/types'
 
 export default function WordsPage() {
   const { profile } = useAuthStore()
+  const { refresh }  = useStreakStore()
   const { add: toast } = useToast()
   const [words, setWords] = useState<Word[]>([])
   const [categories, setCategories] = useState<Category[]>([])
