@@ -15,12 +15,15 @@ import { formatDate, formatTime, formatRelativeTime, getInitials } from '@/lib/u
 import type { LiveExam, ExamResult, QuizQuestion } from '@/types'
 import { cn } from '@/lib/utils'
 import { Trophy, Clock, ArrowLeft, Zap, CheckCircle2, XCircle } from 'lucide-react'
+import { recordActivity } from '@/lib/streak'
+import { useStreakStore } from '@/store/streak'
 
-type View = 'list' | 'exam' | 'leaderboard';
+type View = 'list' | 'exam' | 'leaderboard'
 
 export default function LiveMCQPage() {
   const { profile }    = useAuthStore()
   const { add: toast } = useToast()
+  const { refresh }    = useStreakStore()
 
   const [view, setView]             = useState<View>('list')
   const [exams, setExams]           = useState<LiveExam[]>([])
@@ -162,6 +165,10 @@ export default function LiveMCQPage() {
       answers: null,
     })
 
+    await recordActivity(profile.id, 'live_exam', 1, {
+      perfect: score === questions.length,
+    })
+    refresh(profile.id)
     const { data } = await getExamLeaderboard(activeExam.id)
     setLeaderboard(data ?? [])
     setView('leaderboard')
@@ -323,7 +330,7 @@ export default function LiveMCQPage() {
               Question {qIdx + 1} of {questions.length}
             </p>
             <h2 className="font-playfair text-3xl sm:text-4xl font-black text-[var(--text)]">
-              "{q?.word}"
+              `{q?.word} `
             </h2>
             {q?.bangla_meaning && (
               <p className="text-sm mt-1" style={{ color: 'var(--gold)' }}>{q.bangla_meaning}</p>
