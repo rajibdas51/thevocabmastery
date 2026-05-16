@@ -11,6 +11,8 @@ import ProgressBar from '@/components/ui/Progressbar'
 import { shuffle } from '@/lib/utils'
 import type { Category, Word } from '@/types'
 import { RotateCcw, ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
+import { recordActivity } from '@/lib/streak'
+import { useStreakStore } from '@/store/streak'
 
 type FlashMode = 'eng_to_bangla' | 'bangla_to_eng' | 'eng_to_meaning'
 
@@ -22,6 +24,7 @@ const modeLabels: Record<FlashMode, { front: string; back: string }> = {
 
 export default function FlashcardsPage() {
   const { profile }    = useAuthStore()
+  const { refresh }    = useStreakStore()
   const { add: toast } = useToast()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -72,7 +75,13 @@ export default function FlashcardsPage() {
     if (knows) setKnown(k => k + 1)
     else       setUnknown(u => u + 1)
     setFlipped(false)
-    if (idx + 1 >= words.length) { setDone(true); return }
+    if (idx + 1 >= words.length) {
+      setDone(true)
+      if (profile) {
+        recordActivity(profile.id, 'flashcard_session', words.length).then(() => refresh(profile.id))
+      }
+      return
+    }
     setTimeout(() => setIdx(i => i + 1), 150)
   }
 
@@ -256,7 +265,7 @@ export default function FlashcardsPage() {
                     borderTop: '1px solid var(--border)',
                   }}
                 >
-                  `{card.example}`
+                  `{card.example}` 
                 </p>
               )}
             </div>
