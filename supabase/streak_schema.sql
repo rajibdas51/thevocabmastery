@@ -197,3 +197,25 @@ CREATE POLICY "Own ad watches"            ON public.ad_watches FOR ALL USING (us
 INSERT INTO public.user_streaks (user_id)
 SELECT id FROM public.profiles
 ON CONFLICT DO NOTHING;
+
+-- ── EDITORIALS ────────────────────────────────────────────────
+-- Run this section in Supabase SQL Editor if you haven't already
+CREATE TABLE IF NOT EXISTS public.editorials (
+  id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title          TEXT NOT NULL,
+  source         TEXT NOT NULL,        -- e.g. 'The Daily Star'
+  content        TEXT NOT NULL,        -- HTML from rich text editor
+  published_date DATE NOT NULL,
+  tags           TEXT[] NOT NULL DEFAULT '{}',
+  is_published   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_editorials_date ON public.editorials (published_date DESC);
+CREATE INDEX IF NOT EXISTS idx_editorials_source ON public.editorials (source);
+
+ALTER TABLE public.editorials ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read editorials"  ON public.editorials FOR SELECT USING (is_published = true);
+CREATE POLICY "Admin manage editorials" ON public.editorials FOR ALL    USING (is_admin());
