@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { Trash2, CheckCircle, Circle } from 'lucide-react'
+import { Trash2, CheckCircle, Circle, Pencil} from 'lucide-react'
 import { useSpeech } from '@/hooks/useSpeech'
 import type { Word, PartOfSpeech } from '@/types'
 import { POS_LABELS } from '@/types'
@@ -81,6 +81,7 @@ interface WordCardProps {
   userId?: string
   onDelete?: (id: string) => void
   onMarkLearned?: (id: string) => void
+  onEdit?: (word: Word) => void
   compact?: boolean
 }
 
@@ -106,11 +107,10 @@ export default function WordCard({
 
   return (
     <>
-    <div className='max-h-[80vh] overflow-y-auto'>
-      {/*wordcard */}
+      {/* ── Tile ─────────────────────────────────────────── */}
       <div
         onClick={() => setOpen(true)}
-        className="relative bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)]"
+        className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)]"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -157,7 +157,7 @@ export default function WordCard({
         {/* Example */}
         {word.example && !compact && (
           <p className="text-xs text-[var(--text3)] italic border-l-2 border-[var(--border2)] pl-3 line-clamp-2">
-            `{word.example}` 
+            `{word.example}  `
           </p>
         )}
 
@@ -179,12 +179,7 @@ export default function WordCard({
       </div>
 
       {/* ── Detail Modal ─────────────────────────────────── */}
-      <div className='relative'>
-        <div className='absolute top-2 right-2'>
-
-       
-        
-      <Modal open={open} onClose={() => setOpen(false)}  size="md">
+      <Modal open={open} onClose={() => setOpen(false)} size="md">
         <div className="space-y-5">
           {/* Word header */}
           <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -240,7 +235,7 @@ export default function WordCard({
                 Example Sentence
               </p>
               <p className="text-sm italic text-[var(--text2)] border-l-[3px] border-[var(--accent)] pl-4 leading-relaxed">
-                `{word.example}` 
+                `{word.example} `
               </p>
             </div>
           )}
@@ -295,10 +290,6 @@ export default function WordCard({
           )}
         </div>
       </Modal>
- </div>
-      </div>
-      
-      </div>
     </>
   )
 }

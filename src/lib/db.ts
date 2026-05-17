@@ -21,6 +21,7 @@ export async function getWords(opts?: {
   page?: number
   pageSize?: number
   userId?: string
+  sort?: 'az' | 'za' | 'newest'
 }): Promise<PaginatedResponse<Word>> {
   const db = createClient()
   const page = opts?.page ?? 1
@@ -31,7 +32,10 @@ export async function getWords(opts?: {
   let query = db
     .from('words')
     .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
-    .order('created_at', { ascending: false })
+    .order(
+      opts?.sort === 'newest' ? 'created_at' : 'word',
+      { ascending: opts?.sort !== 'za' && opts?.sort !== 'newest' }
+    )
     .range(from, to)
 
   if (opts?.search) {
@@ -118,11 +122,7 @@ export async function createWord(input: CreateWordInput, userId: string): Promis
   return { data: word as Word, error: null }
 }
 
-export async function updateWord(id: string, updates: Partial<Word>): Promise<ApiResponse<Word>> {
-  const db = createClient()
-  const { data, error } = await db.from('words').update(updates).eq('id', id).select().single()
-  return { data: data as Word | null, error: error?.message ?? null }
-}
+// updateWord moved to bottom of file
 
 export async function deleteWord(id: string): Promise<ApiResponse<null>> {
   const db = createClient()
@@ -404,11 +404,7 @@ export async function deleteFocusWriting(id: string): Promise<ApiResponse<null>>
   return { data: null, error: error?.message ?? null }
 }
 
-export async function updateFocusWriting(id: string, updates: Partial<FocusWriting>): Promise<ApiResponse<FocusWriting>> {
-  const db = createClient()
-  const { data, error } = await db.from('focus_writings').update(updates).eq('id', id).select().single()
-  return { data: data as FocusWriting | null, error: error?.message ?? null }
-}
+// updateFocusWriting moved to bottom of file
 
 // ─── WORD OF DAY ──────────────────────────────────────────────
 
@@ -574,4 +570,71 @@ export async function countWordsWithExamples(categoryId: string): Promise<number
     .not('example', 'eq', '')
 
   return count ?? 0
+}
+
+// ─── EDITORIALS ───────────────────────────────────────────────
+
+export async function getEditorials(): Promise<ApiResponse<any[]>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('editorials')
+    .select('*')
+    .eq('is_published', true)
+    .order('published_date', { ascending: false })
+  return { data: data ?? [], error: error?.message ?? null }
+}
+
+export async function getEditorialById(id: string): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('editorials').select('*').eq('id', id).single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function createEditorial(input: {
+  title: string; source: string; content: string
+  published_date: string; tags?: string[]
+}, userId: string): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('editorials')
+    .insert({ ...input, tags: input.tags ?? [], created_by: userId, is_published: true })
+    .select().single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function updateEditorial(id: string, updates: {
+  title?: string; source?: string; content?: string
+  published_date?: string; tags?: string[]
+}): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('editorials').update(updates).eq('id', id).select().single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function deleteEditorial(id: string): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db.from('editorials').delete().eq('id', id)
+  return { data: null, error: error?.message ?? null }
+}
+
+export async function updateWord(id: string, updates: {
+  word?: string; bangla_meaning?: string; english_meaning?: string
+  synonyms?: string[]; antonyms?: string[]; example?: string
+  part_of_speech?: string; pronunciation?: string
+}): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('words').update(updates).eq('id', id).select().single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function updateFocusWriting(id: string, updates: {
+  title?: string; category?: string; content?: string; tags?: string[]
+}): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('focus_writings').update(updates).eq('id', id).select().single()
+  return { data, error: error?.message ?? null }
 }
