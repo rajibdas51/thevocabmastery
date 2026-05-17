@@ -11,7 +11,7 @@ import { isPremiumPlan } from '@/lib/streak'
 import {
   LayoutDashboard, BookOpen, FolderOpen, CreditCard, PenSquare,
   Edit3, PlusCircle, ShieldAlert, LogOut, ChevronLeft, ChevronRight,
-  Sun, Moon, X, PenLine, Zap, Crown,
+  Sun, Moon, X, PenLine, Zap, Crown, Newspaper,
 } from 'lucide-react'
 
 const navSections = [
@@ -36,6 +36,7 @@ const navSections = [
     label: 'Learn',
     items: [
       { href: '/focus-writing',  label: 'Focus Writing',     icon: Edit3           },
+      { href: '/editorials',     label: 'Editorials',        icon: Newspaper       },
       { href: '/add-word',       label: 'Add Word',          icon: PlusCircle      },
     ],
   },
