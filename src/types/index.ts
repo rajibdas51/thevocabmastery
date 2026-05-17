@@ -136,3 +136,24 @@ export const POS_LABELS: Record<PartOfSpeech, { short: string; color: string }> 
   interjection: { short: 'int.',  color: '#e879f9' },
   pronoun:      { short: 'pron.', color: '#22d3ee' },
 }
+
+export interface Editorial {
+  id: string
+  title: string
+  source: string        // e.g. 'The Daily Star', 'Prothom Alo'
+  content: string       // HTML from rich text editor
+  published_date: string // 'YYYY-MM-DD'
+  tags: string[]
+  is_published: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateEditorialInput {
+  title: string
+  source: string
+  content: string
+  published_date: string
+  tags?: string[]
+}
