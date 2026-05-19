@@ -1,12 +1,8 @@
-/**
- * FILE: src/app/api/payment/fail/route.ts
- * SSLCommerz redirects here on payment failure.
- */
 import { NextRequest, NextResponse } from 'next/server'
-
+const APP = process.env.NEXT_PUBLIC_APP_URL ?? 'https://thevocabmastery.vercel.app'
 export async function POST(req: NextRequest) {
-  return NextResponse.redirect(new URL('/premium?status=failed', req.url))
+  return NextResponse.redirect(new URL('/premium?status=failed', APP))
 }
 export async function GET(req: NextRequest) {
-  return NextResponse.redirect(new URL('/premium?status=failed', req.url))
+  return NextResponse.redirect(new URL('/premium?status=failed', APP))
 }
