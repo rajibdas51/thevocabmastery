@@ -15,6 +15,7 @@ import { ArrowLeft, Plus, Sparkles, Trash2, Tag, FileText, Pencil } from 'lucide
 import { formatDate } from '@/lib/utils'
 import type { FocusWriting } from '@/types'
 import { cn } from '@/lib/utils'
+import RichContent from '@/components/ui/RichContent'
 
 const CATEGORIES = [
   'Environment','Education','Economy','Technology',
@@ -170,11 +171,7 @@ export default function FocusWritingPage() {
             </h1>
             <div className="h-px mb-6" style={{ background:'var(--border)' }} />
             {/* Render rich HTML content */}
-            <div
-              className="prose-content text-[15px] leading-[1.9]"
-              style={{ color:'var(--text2)' }}
-              dangerouslySetInnerHTML={{ __html: selected.content }}
-            />
+            <RichContent html={selected.content} />
             {visibleTags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-6 pt-4" style={{ borderTop:'1px solid var(--border)' }}>
                 <Tag className="w-3.5 h-3.5" style={{ color:'var(--text3)' }} />
