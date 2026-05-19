@@ -13,6 +13,7 @@ import RichTextEditor from '@/components/ui/RichTextEditor'
 import { ArrowLeft, Plus, Trash2, Pencil, Newspaper, Search, Tag } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import RichContent from '@/components/ui/RichContent'
 
 const SOURCES = [
   'The Daily Star', 'Prothom Alo', 'The Financial Express',
@@ -164,11 +165,7 @@ export default function EditorialsPage() {
             </h1>
             <div className="h-px mb-6" style={{ background:'var(--border)' }} />
             {/* Rich HTML content */}
-            <div
-              className="prose-content text-[15px] leading-[1.9]"
-              style={{ color:'var(--text2)' }}
-              dangerouslySetInnerHTML={{ __html: selected.content }}
-            />
+           <RichContent html={selected.content} />
             {selected.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-6 pt-4" style={{ borderTop:'1px solid var(--border)' }}>
                 <Tag className="w-3.5 h-3.5 mt-0.5" style={{ color:'var(--text3)' }} />
