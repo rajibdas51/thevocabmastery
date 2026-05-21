@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 3. Get authenticated user via server Supabase client ─
-    const cookieStore = cookies()
+    const cookieStore = await cookies()  // ✅ fixed: await added
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
