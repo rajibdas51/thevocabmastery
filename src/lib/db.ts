@@ -638,3 +638,93 @@ export async function updateFocusWriting(id: string, updates: {
     .from('focus_writings').update(updates).eq('id', id).select().single()
   return { data, error: error?.message ?? null }
 }
+
+
+// ─── ANALOGIES ────────────────────────────────────────────────
+
+export async function getAnalogies(opts?: {
+  relationship_type?: string
+  difficulty?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<PaginatedResponse<any>> {
+  const db = createClient()
+  const page = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 20
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  let query = db
+    .from('analogies')
+    .select('*', { count: 'exact' })
+    .eq('is_published', true)
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (opts?.relationship_type && opts.relationship_type !== 'all')
+    query = query.eq('relationship_type', opts.relationship_type)
+  if (opts?.difficulty && opts.difficulty !== 'all')
+    query = query.eq('difficulty', opts.difficulty)
+  if (opts?.search)
+    query = query.or(`word_a.ilike.%${opts.search}%,word_b.ilike.%${opts.search}%`)
+
+  const { data, count, error } = await query
+  return { data: data ?? [], count: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize), error: error?.message ?? null }
+}
+
+export async function getAnalogyById(id: string): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db.from('analogies').select('*').eq('id', id).single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function getAnalogyQuiz(opts?: {
+  relationship_type?: string
+  difficulty?: string
+  count?: number
+}): Promise<ApiResponse<any[]>> {
+  const db = createClient()
+  let query = db.from('analogies').select('*').eq('is_published', true)
+  if (opts?.relationship_type && opts.relationship_type !== 'all')
+    query = query.eq('relationship_type', opts.relationship_type)
+  if (opts?.difficulty && opts.difficulty !== 'all')
+    query = query.eq('difficulty', opts.difficulty)
+
+  const { data, error } = await query
+  if (error || !data?.length) return { data: [], error: error?.message ?? 'No analogies found' }
+
+  // Shuffle and take requested count
+  const shuffled = [...data].sort(() => Math.random() - 0.5).slice(0, opts?.count ?? 10)
+  return { data: shuffled, error: null }
+}
+
+export async function createAnalogy(input: any, userId: string): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db
+    .from('analogies')
+    .insert({ ...input, created_by: userId, is_published: true })
+    .select().single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function updateAnalogy(id: string, updates: any): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db.from('analogies').update(updates).eq('id', id).select().single()
+  return { data, error: error?.message ?? null }
+}
+
+export async function deleteAnalogy(id: string): Promise<ApiResponse<null>> {
+  const db = createClient()
+  const { error } = await db.from('analogies').delete().eq('id', id)
+  return { data: null, error: error?.message ?? null }
+}
+
+export async function saveAnalogyAttempt(attempt: {
+  user_id: string; analogy_id: string
+  selected_option: string; is_correct: boolean; time_taken_ms?: number
+}): Promise<ApiResponse<any>> {
+  const db = createClient()
+  const { data, error } = await db.from('analogy_attempts').insert(attempt).select().single()
+  return { data, error: error?.message ?? null }
+}
