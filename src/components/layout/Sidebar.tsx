@@ -11,8 +11,8 @@ import { isPremiumPlan } from '@/lib/streak'
 import {
   LayoutDashboard, BookOpen, FolderOpen, CreditCard, PenSquare,
   Edit3, PlusCircle, ShieldAlert, LogOut, ChevronLeft, ChevronRight,
-  Sun, Moon, X, PenLine, Zap, Crown, Newspaper,
-} from 'lucide-react'
+  Sun, Moon, X, PenLine, Zap, Crown, Newspaper, Link2
+} from 'lucide-react';
 
 const navSections = [
   {
@@ -30,6 +30,7 @@ const navSections = [
       { href: '/quiz',           label: 'Take Quiz',         icon: PenSquare       },
       { href: '/fill-blank',     label: 'Fill in the Blank', icon: PenLine         },
       { href: '/live-mcq',       label: 'Live MCQ',          icon: Zap, badge: 'LIVE' },
+      { href: '/analogy', label: 'GRE Analogy', icon: Link2 },
     ],
   },
   {
