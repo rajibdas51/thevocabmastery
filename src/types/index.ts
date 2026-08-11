@@ -157,3 +157,4 @@ export interface CreateEditorialInput {
   published_date: string
   tags?: string[]
 }
+
