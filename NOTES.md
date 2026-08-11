@@ -256,7 +256,6 @@ UX reasoning
 gamification psychology explanation
 
 The final system should feel like a premium modern learning platform that combines:
-
 Duolingo retention
 Notion-quality UI polish
 modern mobile game engagement
