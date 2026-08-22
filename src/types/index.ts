@@ -126,6 +126,47 @@ export interface CategoryProgress {
   category: Category; learned: number; total: number; percentage: number
 }
 
+export type AnalogyRelationshipType =
+  | 'cause_effect' | 'part_whole' | 'type_category' | 'degree'
+  | 'tool_purpose' | 'worker_tool' | 'worker_product' | 'antonym'
+  | 'synonym' | 'characteristic' | 'location' | 'sequence' | 'other'
+
+export type AnalogyDifficulty = 'easy' | 'medium' | 'hard'
+
+export interface AnalogyOption {
+  id: string; word_c: string; word_d: string
+  word_c_bn: string; word_d_bn: string
+}
+
+export interface Analogy {
+  id: string; word_a: string; word_b: string
+  word_a_bn: string | null; word_b_bn: string | null
+  relationship: string; relationship_type: AnalogyRelationshipType
+  options: AnalogyOption[]; correct_option: string
+  explanation_bn: string; relationship_explanation: string | null
+  source: string | null; difficulty: AnalogyDifficulty
+  is_published: boolean; created_by: string | null
+  created_at: string; updated_at: string
+}
+
+export interface CreateAnalogyInput {
+  word_a: string; word_b: string; word_a_bn?: string; word_b_bn?: string
+  relationship: string; relationship_type: AnalogyRelationshipType
+  options: AnalogyOption[]; correct_option: string
+  explanation_bn: string; relationship_explanation?: string
+  source?: string; difficulty: AnalogyDifficulty
+}
+
+export const RELATIONSHIP_TYPE_LABELS: Record<AnalogyRelationshipType, string> = {
+  cause_effect:'Cause → Effect', part_whole:'Part → Whole',
+  type_category:'Type → Category', degree:'Degree',
+  tool_purpose:'Tool → Purpose', worker_tool:'Worker → Tool',
+  worker_product:'Worker → Product', antonym:'Antonym',
+  synonym:'Synonym', characteristic:'Characteristic',
+  location:'Location', sequence:'Sequence', other:'Other',
+}
+
+
 export const POS_LABELS: Record<PartOfSpeech, { short: string; color: string }> = {
   noun:         { short: 'n.',    color: '#60a5fa' },
   verb:         { short: 'v.',    color: '#34d399' },

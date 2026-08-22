@@ -11,7 +11,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
-import ProgressBar from '@/components/ui/ProgressBar'
+import ProgressBar from '@/components/ui/Progressbar'
 import {
   BookOpen, PenSquare, Plus, ArrowLeft, ChevronRight,
   CheckCircle2, XCircle, Lightbulb, Trash2, Pencil,
