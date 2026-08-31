@@ -24,35 +24,49 @@ export async function getWords(opts?: {
   sort?: 'az' | 'za' | 'newest'
 }): Promise<PaginatedResponse<Word>> {
   const db = createClient()
-  const page = opts?.page ?? 1
+  const page     = opts?.page     ?? 1
   const pageSize = opts?.pageSize ?? 20
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  const from     = (page - 1) * pageSize
+  const to       = from + pageSize - 1
 
+  // If filtering by category, get word IDs first
+  let filteredIds: string[] | null = null
+  if (opts?.categoryId) {
+    const { data: wids } = await db
+      .from('word_categories')
+      .select('word_id')
+      .eq('category_id', opts.categoryId)
+    
+    if (!wids || wids.length === 0) {
+      return { data: [], count: 0, page, pageSize, totalPages: 0, error: null }
+    }
+    filteredIds = wids.map((r: any) => r.word_id)
+  }
+
+  // Build main query
   let query = db
     .from('words')
     .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
-    .order(
-      opts?.sort === 'newest' ? 'created_at' : 'word',
-      { ascending: opts?.sort !== 'za' && opts?.sort !== 'newest' }
-    )
-    .range(from, to)
 
+  // Apply category filter
+  if (filteredIds) {
+    query = query.in('id', filteredIds)
+  }
+
+  // Apply search
   if (opts?.search) {
     query = query.or(
       `word.ilike.%${opts.search}%,english_meaning.ilike.%${opts.search}%,bangla_meaning.ilike.%${opts.search}%`
     )
   }
 
-  if (opts?.categoryId) {
-    const { data: wids } = await db
-      .from('word_categories')
-      .select('word_id')
-      .eq('category_id', opts.categoryId)
-    const ids = (wids ?? []).map((r: any) => r.word_id)
-    if (ids.length === 0) return { data: [], count: 0, page, pageSize, totalPages: 0, error: null }
-    query = query.in('id', ids)
-  }
+  // Apply sort
+  const sortCol = opts?.sort === 'newest' ? 'created_at' : 'word'
+  const asc     = opts?.sort === 'za' ? false : opts?.sort === 'newest' ? false : true
+  query = query.order(sortCol, { ascending: asc })
+
+  // Apply pagination
+  query = query.range(from, to)
 
   const { data, count, error } = await query
 
@@ -62,12 +76,12 @@ export async function getWords(opts?: {
   }))
 
   return {
-    data: words,
-    count: count ?? 0,
+    data:       words,
+    count:      count ?? 0,
     page,
     pageSize,
     totalPages: Math.ceil((count ?? 0) / pageSize),
-    error: error?.message ?? null,
+    error:      error?.message ?? null,
   }
 }
 
