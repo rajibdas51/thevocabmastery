@@ -29,43 +29,31 @@ export async function getWords(opts?: {
   const from     = (page - 1) * pageSize
   const to       = from + pageSize - 1
 
-  // If filtering by category, get word IDs first
-  let filteredIds: string[] | null = null
-  if (opts?.categoryId) {
-    const { data: wids } = await db
-      .from('word_categories')
-      .select('word_id')
-      .eq('category_id', opts.categoryId)
-    
-    if (!wids || wids.length === 0) {
-      return { data: [], count: 0, page, pageSize, totalPages: 0, error: null }
-    }
-    filteredIds = wids.map((r: any) => r.word_id)
-  }
+  // ── Category filter: use a proper !inner join instead of
+  //    fetching all IDs and stuffing them into .in() —
+  //    that breaks with large categories (URL too long / 400 error) ──
+  let query = opts?.categoryId
+    ? db
+        .from('words')
+        .select('*, categories:word_categories!inner(category:categories(*))', { count: 'exact' })
+        .eq('categories.category_id', opts.categoryId)
+    : db
+        .from('words')
+        .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
 
-  // Build main query
-  let query = db
-    .from('words')
-    .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
-
-  // Apply category filter
-  if (filteredIds) {
-    query = query.in('id', filteredIds)
-  }
-
-  // Apply search
+  // Search
   if (opts?.search) {
     query = query.or(
       `word.ilike.%${opts.search}%,english_meaning.ilike.%${opts.search}%,bangla_meaning.ilike.%${opts.search}%`
     )
   }
 
-  // Apply sort
+  // Sort
   const sortCol = opts?.sort === 'newest' ? 'created_at' : 'word'
   const asc     = opts?.sort === 'za' ? false : opts?.sort === 'newest' ? false : true
   query = query.order(sortCol, { ascending: asc })
 
-  // Apply pagination
+  // Pagination
   query = query.range(from, to)
 
   const { data, count, error } = await query
