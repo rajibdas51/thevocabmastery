@@ -29,9 +29,7 @@ export async function getWords(opts?: {
   const from     = (page - 1) * pageSize
   const to       = from + pageSize - 1
 
-  // ── Category filter: use a proper !inner join instead of
-  //    fetching all IDs and stuffing them into .in() —
-  //    that breaks with large categories (URL too long / 400 error) ──
+  // Category filter via inner join (fixes the earlier URL-too-long bug)
   let query = opts?.categoryId
     ? db
         .from('words')
@@ -41,27 +39,42 @@ export async function getWords(opts?: {
         .from('words')
         .select('*, categories:word_categories(category:categories(*))', { count: 'exact' })
 
-  // Search
   if (opts?.search) {
     query = query.or(
       `word.ilike.%${opts.search}%,english_meaning.ilike.%${opts.search}%,bangla_meaning.ilike.%${opts.search}%`
     )
   }
 
-  // Sort
   const sortCol = opts?.sort === 'newest' ? 'created_at' : 'word'
   const asc     = opts?.sort === 'za' ? false : opts?.sort === 'newest' ? false : true
   query = query.order(sortCol, { ascending: asc })
-
-  // Pagination
   query = query.range(from, to)
 
   const { data, count, error } = await query
 
-  const words: Word[] = (data ?? []).map((w: any) => ({
+  let words: Word[] = (data ?? []).map((w: any) => ({
     ...w,
     categories: (w.categories ?? []).map((wc: any) => wc.category).filter(Boolean),
+    user_progress: null as any,
   }))
+
+  // ── Fetch this user's progress for exactly these words ──
+  // (separate query — simpler & avoids join complexity, only
+  //  covers the current page's word IDs, so it stays fast)
+  if (opts?.userId && words.length > 0) {
+    const wordIds = words.map(w => w.id)
+    const { data: progressRows } = await db
+      .from('user_word_progress')
+      .select('*')
+      .eq('user_id', opts.userId)
+      .in('word_id', wordIds)
+
+    const progressMap = new Map((progressRows ?? []).map((p: any) => [p.word_id, p]))
+    words = words.map(w => ({
+      ...w,
+      user_progress: progressMap.get(w.id) ?? null,
+    }))
+  }
 
   return {
     data:       words,
