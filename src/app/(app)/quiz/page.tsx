@@ -25,6 +25,7 @@ const COUNT_OPTIONS = [
   { value: '20',  label: '20 Questions'  },
   { value: '50',  label: '50 Questions'  },
   { value: '100', label: '100 Questions' },
+  { value: 'all', label: 'All Matching'  },
 ]
 
 interface TypeOption {
@@ -59,8 +60,8 @@ export default function QuizPage() {
 
   const [step,      setStep]      = useState<Step>('setup')
   const [categories, setCategories] = useState<Category[]>([])
-  const [catId,     setCatId]     = useState('')
-  const [count,     setCount]     = useState('10')
+  const [catId,     setCatId]     = useState('')            // '' = All Categories
+  const [count,     setCount]     = useState('10')           // can be 'all'
   const [quizType,  setQuizType]  = useState<QuizType>('meaning_en')
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [current,   setCurrent]   = useState(0)
@@ -74,10 +75,15 @@ export default function QuizPage() {
   const [pointsOk,    setPointsOk]    = useState(true)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
+  // ── New filter state ─────────────────────────────────────
+  const [prefixEnabled, setPrefixEnabled] = useState(false)
+  const [prefix,        setPrefix]        = useState('')
+  const [learnedOnly,   setLearnedOnly]   = useState(false)
+
   useEffect(() => {
     if (profile) getCategories(profile.id).then(({ data }) => {
       setCategories(data ?? [])
-      if (data?.[0]) setCatId(data[0].id)
+      // Default remains "All Categories" (catId stays '')
     })
   }, [profile])
 
@@ -95,7 +101,14 @@ export default function QuizPage() {
     const check = await checkCanStartQuiz(profile.id)
     if (!check.can_start) { setOutOfPoints(true); return }
     setLoading(true)
-    const { data, error } = await getQuizQuestions(catId, parseInt(count), quizType)
+    const { data, error } = await getQuizQuestions({
+      categoryId:  catId || undefined,
+      prefix:      prefixEnabled ? prefix : undefined,
+      count:       count === 'all' ? 'all' : parseInt(count),
+      quizType,
+      learnedOnly,
+      userId: profile.id,
+    })
     if (error || !data?.length) {
       toast(error ?? 'No words found', 'error')
       setLoading(false); return
@@ -127,7 +140,7 @@ export default function QuizPage() {
       if (profile) {
         const score = newAnswers.filter(a => a.isCorrect).length
         await saveQuizAttempt({
-          user_id: profile.id, category_id: catId, quiz_type: quizType,
+          user_id: profile.id, category_id: catId || null, quiz_type: quizType,
           score, total_questions: questions.length,
           percentage: Math.round((score / questions.length) * 100),
           time_taken_seconds: elapsed,
@@ -136,6 +149,14 @@ export default function QuizPage() {
             selected: a.selected, correct: a.correct, is_correct: a.isCorrect,
           })),
         })
+        const actResult = await recordActivity(profile.id, 'quiz_complete', 1, {
+          perfect: score === questions.length,
+          quiz_wrong_count: questions.length - score,
+        })
+        if (actResult.milestones_unlocked.length > 0) {
+          queueMilestones(actResult.milestones_unlocked)
+        }
+        refresh(profile.id)
       }
       setStep('result')
     } else {
@@ -149,11 +170,103 @@ export default function QuizPage() {
       <PageHeader title="Take a Quiz" subtitle="Test your vocabulary knowledge" />
       <div className="p-4 sm:p-8 max-w-2xl">
         <Card className="p-5 sm:p-6 space-y-6">
+
+          {/* Category — now includes "All Categories" */}
           <Select
             label="Category / List"
             value={catId} onChange={setCatId}
-            options={categories.map(c => ({ value: c.id, label: c.name }))}
+            options={[
+              { value: '', label: '🌐 All Categories (every word combined)' },
+              ...categories.map(c => ({ value: c.id, label: c.name })),
+            ]}
           />
+
+          {/* Learned Words Only toggle */}
+          <div
+            className="p-4 rounded-xl border flex items-center justify-between gap-3"
+            style={{
+              background:  learnedOnly ? 'rgba(34,211,160,0.08)' : 'var(--bg3)',
+              borderColor: learnedOnly ? 'rgba(34,211,160,0.35)' : 'var(--border2)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🎓</span>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                  Quiz on Learned Words Only
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
+                  Test yourself only on words you've marked as learned
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setLearnedOnly(v => !v)}
+              className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+              style={{ background: learnedOnly ? '#22d3a0' : 'var(--bg4)' }}
+            >
+              <span
+                className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-sm"
+                style={{ transform: learnedOnly ? 'translateX(22px)' : 'translateX(2px)' }}
+              />
+            </button>
+          </div>
+
+          {/* Letter / Prefix Filter */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>
+                Filter by Starting Letters
+              </p>
+              <button
+                onClick={() => setPrefixEnabled(v => !v)}
+                className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                style={{ background: prefixEnabled ? 'var(--accent)' : 'var(--bg3)' }}
+              >
+                <span
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                  style={{ transform: prefixEnabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                />
+              </button>
+            </div>
+
+            {prefixEnabled && (
+              <div className="space-y-3">
+                <input
+                  value={prefix}
+                  onChange={e => setPrefix(e.target.value.replace(/[^a-zA-Z]/g, ''))}
+                  placeholder="e.g. a, ab, cab, pre..."
+                  maxLength={12}
+                  className="w-full bg-[var(--card-bg)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text3)] outline-none focus:border-[var(--accent)]/50 transition-colors font-mono uppercase tracking-wider"
+                />
+                <p className="text-[11px]" style={{ color: 'var(--text3)' }}>
+                  Quiz will only include words starting with{' '}
+                  <strong style={{ color: 'var(--accent2)' }}>
+                    {prefix ? prefix.toUpperCase() : '...'}
+                  </strong>
+                  {prefix ? '' : ' (type above, or pick a letter below)'}
+                </p>
+
+                {/* Quick A-Z picker */}
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)).map(letter => (
+                    <button
+                      key={letter}
+                      onClick={() => setPrefix(letter)}
+                      className="w-7 h-7 rounded-lg text-xs font-bold border transition-all"
+                      style={{
+                        background:  prefix.toUpperCase() === letter ? 'var(--accent)' : 'var(--bg3)',
+                        borderColor: prefix.toUpperCase() === letter ? 'var(--accent)' : 'var(--border2)',
+                        color:       prefix.toUpperCase() === letter ? '#fff' : 'var(--text2)',
+                      }}
+                    >
+                      {letter}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Quiz type grid */}
           <div>
@@ -316,7 +429,7 @@ export default function QuizPage() {
 
           {/* The word / sentence */}
           <h2 className="font-playfair text-3xl sm:text-4xl font-black" style={{ color: 'var(--text)' }}>
-            `{q?.word} `
+            "{q?.word}"
           </h2>
 
           {/* Sub-labels */}
