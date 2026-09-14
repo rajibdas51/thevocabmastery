@@ -84,7 +84,11 @@ export default function FillBlankPage() {
     }
     setLoading(true)
     // Fetch more than needed since blanks need the word in the sentence
-    const { data, error } = await getQuizQuestions(catId, parseInt(count) * 2, 'fill_blank')
+    const { data, error } = await getQuizQuestions({
+  categoryId: catId,
+  count: parseInt(count) * 2,
+  quizType: 'fill_blank',
+})
     if (error || !data?.length) {
       toast(error ?? 'Failed to load questions', 'error')
       setLoading(false); return
