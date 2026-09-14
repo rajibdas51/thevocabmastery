@@ -192,29 +192,74 @@ export async function upsertProgress(userId: string, wordId: string, status: Use
 
 // ─── QUIZ ─────────────────────────────────────────────────────
 
-export async function getQuizQuestions(
-  categoryId: string,
-  count: number,
-  quizType: QuizType = 'meaning_en'
-): Promise<ApiResponse<QuizQuestion[]>> {
+/**
+ * REPLACE getQuizQuestions in src/lib/db.ts with this version.
+ * Adds: learnedOnly + userId — when true, only quizzes on words
+ * the user has personally marked as 'learned'.
+ */
+export async function getQuizQuestions(opts: {
+  categoryId?: string
+  prefix?: string
+  count: number | 'all'
+  quizType?: QuizType
+  learnedOnly?: boolean
+  userId?: string          // required if learnedOnly is true
+}): Promise<ApiResponse<QuizQuestion[]>> {
   const db = createClient()
+  const quizType = opts.quizType ?? 'meaning_en'
 
-  const { data: wids } = await db
-    .from('word_categories').select('word_id').eq('category_id', categoryId)
-  if (!wids?.length) return { data: [], error: 'No words in this category' }
+  // ── If quizzing on learned words, get those word IDs first ──
+  let learnedIds: string[] | null = null
+  if (opts.learnedOnly && opts.userId) {
+    const { data: progress } = await db
+      .from('user_word_progress')
+      .select('word_id')
+      .eq('user_id', opts.userId)
+      .eq('status', 'learned')
 
-  const ids = wids.map((r: any) => r.word_id)
-  const { data: words, error } = await db
-    .from('words')
-    .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms, example')
-    .in('id', ids)
+    if (!progress?.length) {
+      return { data: [], error: "You haven't marked any words as learned yet. Go learn some words first!" }
+    }
+    learnedIds = progress.map((p: any) => p.word_id)
+  }
 
-  if (error || !words?.length) return { data: [], error: error?.message ?? 'No words found' }
+  // ── Build the word pool ──────────────────────────────────
+  let query = opts.categoryId
+    ? db
+        .from('words')
+        .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms, example, categories:word_categories!inner(category_id)')
+        .eq('categories.category_id', opts.categoryId)
+    : db
+        .from('words')
+        .select('id, word, bangla_meaning, english_meaning, synonyms, antonyms, example')
 
-  // For mixed, pick from all except fill_blank (fill_blank needs example sentences)
+  if (opts.prefix && opts.prefix.trim()) {
+    query = query.ilike('word', `${opts.prefix.trim()}%`)
+  }
+
+  // Learned-only filter — safe even with large lists since we
+  // scope with categoryId/prefix first when possible, and this
+  // path only fires from the "Learned Words" quiz mode
+  if (learnedIds) {
+    query = query.in('id', learnedIds)
+  }
+
+  query = query.limit(1000)
+
+  const { data: words, error } = await query
+  if (error || !words?.length) {
+    return {
+      data: [],
+      error: error?.message ?? (opts.learnedOnly
+        ? 'No learned words match these filters. Try removing the category/letter filter.'
+        : 'No words found matching these filters'),
+    }
+  }
+
+  const requestedCount = opts.count === 'all' ? words.length : opts.count
   const MIXED_POOL: QuizType[] = ['meaning_en', 'meaning_bn', 'synonym', 'antonym']
 
-  const shuffled = [...words].sort(() => Math.random() - 0.5).slice(0, Math.min(count, words.length))
+  const shuffled = [...words].sort(() => Math.random() - 0.5).slice(0, Math.min(requestedCount, words.length))
 
   const questions: QuizQuestion[] = shuffled
     .map((w: any): QuizQuestion | null => {
@@ -223,14 +268,13 @@ export async function getQuizQuestions(
         type = MIXED_POOL[Math.floor(Math.random() * MIXED_POOL.length)]
       }
 
-      // ── MEANING (English) ──────────────────────────────────
-      // Show English word → pick correct English meaning from 4 options
       if (type === 'meaning_en') {
         const wrongs = words
           .filter((x: any) => x.id !== w.id)
           .sort(() => Math.random() - 0.5)
           .slice(0, 3)
           .map((x: any) => x.english_meaning)
+        if (wrongs.length < 3) return null
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: w.english_meaning,
@@ -240,17 +284,11 @@ export async function getQuizQuestions(
         }
       }
 
-      // ── MEANING (Bangla) ───────────────────────────────────
-      // Show English word → pick correct Bangla meaning from 4 options
       if (type === 'meaning_bn') {
         if (!w.bangla_meaning) return null
-        // Need other words that also have bangla meanings for wrong options
         const withBangla = words.filter((x: any) => x.id !== w.id && x.bangla_meaning)
         if (withBangla.length < 3) return null
-        const wrongs = withBangla
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 3)
-          .map((x: any) => x.bangla_meaning as string)
+        const wrongs = withBangla.sort(() => Math.random() - 0.5).slice(0, 3).map((x: any) => x.bangla_meaning as string)
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: w.bangla_meaning,
@@ -260,7 +298,6 @@ export async function getQuizQuestions(
         }
       }
 
-      // ── SYNONYM ────────────────────────────────────────────
       if (type === 'synonym') {
         const syns: string[] = w.synonyms ?? []
         if (!syns.length) return null
@@ -280,7 +317,6 @@ export async function getQuizQuestions(
         }
       }
 
-      // ── ANTONYM ────────────────────────────────────────────
       if (type === 'antonym') {
         const ants: string[] = w.antonyms ?? []
         if (!ants.length) return null
@@ -300,10 +336,8 @@ export async function getQuizQuestions(
         }
       }
 
-      // ── FILL IN THE BLANK ──────────────────────────────────
       if (type === 'fill_blank') {
         if (!w.example) return null
-        // Replace the word in the example with ___
         const regex = new RegExp(`\\b${w.word}\\b`, 'i')
         if (!regex.test(w.example)) return null
         const sentence = w.example.replace(regex, '___')
@@ -312,6 +346,7 @@ export async function getQuizQuestions(
           .sort(() => Math.random() - 0.5)
           .slice(0, 3)
           .map((x: any) => x.word)
+        if (wrongWords.length < 3) return null
         return {
           word_id: w.id, word: w.word, bangla_meaning: w.bangla_meaning,
           correct_answer: w.word,
@@ -327,7 +362,7 @@ export async function getQuizQuestions(
     .filter(Boolean) as QuizQuestion[]
 
   if (!questions.length) {
-    return { data: [], error: 'Not enough word data for this quiz type. Try adding more synonyms/antonyms/examples.' }
+    return { data: [], error: 'Not enough word data for this quiz type/filter combo. Try a broader letter filter or different quiz type.' }
   }
 
   return { data: questions, error: null }
