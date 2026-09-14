@@ -108,7 +108,11 @@ export default function LiveMCQPage() {
     if (qs.length === 0) {
       const catId = exam.category_id
       if (catId) {
-        const { data, error } = await getQuizQuestions(catId, exam.question_count, 'meaning_en')
+        const { data, error } = await getQuizQuestions({
+  categoryId: catId,
+  count: exam.question_count,
+  quizType: 'meaning_en',
+})
         if (error || !data?.length) {
           toast('No words found for this exam\'s category. Ask admin to add words first.', 'error')
           setEntering(null); return
