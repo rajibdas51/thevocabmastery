@@ -475,6 +475,75 @@ export async function setWordOfDay(wordId: string, userId: string, date?: string
   return { data: data as WordOfDay | null, error: error?.message ?? null }
 }
 
+// - Flashcard -
+
+export async function getFlashcardWords(opts: {
+  categoryId?: string
+  prefix?: string
+  count: number | 'all'
+  learnedOnly?: boolean
+  userId?: string
+}): Promise<ApiResponse<Word[]>> {
+  const db = createClient()
+
+  // ── Learned-only: narrow to this user's learned word IDs first ──
+  let learnedIds: string[] | null = null
+  if (opts.learnedOnly && opts.userId) {
+    const { data: progress } = await db
+      .from('user_word_progress')
+      .select('word_id')
+      .eq('user_id', opts.userId)
+      .eq('status', 'learned')
+
+    if (!progress?.length) {
+      return { data: [], error: "You haven't marked any words as learned yet. Go learn some words first!" }
+    }
+    learnedIds = progress.map((p: any) => p.word_id)
+  }
+
+  // ── Build the word pool ──────────────────────────────────
+  let query = opts.categoryId
+    ? db
+        .from('words')
+        .select('*, categories:word_categories!inner(category:categories(*))')
+        .eq('categories.category_id', opts.categoryId)
+    : db
+        .from('words')
+        .select('*, categories:word_categories(category:categories(*))')
+
+  if (opts.prefix && opts.prefix.trim()) {
+    query = query.ilike('word', `${opts.prefix.trim()}%`)
+  }
+
+  if (learnedIds) {
+    query = query.in('id', learnedIds)
+  }
+
+  query = query.order('word').limit(1000)
+
+  const { data, error } = await query
+  if (error || !data?.length) {
+    return {
+      data: [],
+      error: error?.message ?? (opts.learnedOnly
+        ? 'No learned words match these filters.'
+        : 'No words found matching these filters'),
+    }
+  }
+
+  let words: Word[] = data.map((w: any) => ({
+    ...w,
+    categories: (w.categories ?? []).map((wc: any) => wc.category).filter(Boolean),
+  }))
+
+  // Shuffle then slice to requested count (or keep all)
+  words = [...words].sort(() => Math.random() - 0.5)
+  if (opts.count !== 'all') {
+    words = words.slice(0, opts.count)
+  }
+
+  return { data: words, error: null }
+}
 // ─── DASHBOARD ────────────────────────────────────────────────
 
 export async function getDashboardStats(userId: string): Promise<ApiResponse<DashboardStats>> {
