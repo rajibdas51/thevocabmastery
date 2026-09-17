@@ -29,7 +29,6 @@ export async function getWords(opts?: {
   const from     = (page - 1) * pageSize
   const to       = from + pageSize - 1
 
-  // Category filter via inner join (fixes the earlier URL-too-long bug)
   let query = opts?.categoryId
     ? db
         .from('words')
@@ -58,18 +57,30 @@ export async function getWords(opts?: {
     user_progress: null as any,
   }))
 
-  // ── Fetch this user's progress for exactly these words ──
-  // (separate query — simpler & avoids join complexity, only
-  //  covers the current page's word IDs, so it stays fast)
+  // ── Fetch progress in BATCHES to avoid URL-too-long errors ──
+  // Supabase/PostgREST breaks past ~300-400 UUIDs in one .in() call,
+  // so for large pageSize (e.g. flashcards fetching 1000 words) we
+  // split the ID list into chunks of 150 and run them in parallel.
   if (opts?.userId && words.length > 0) {
     const wordIds = words.map(w => w.id)
-    const { data: progressRows } = await db
-      .from('user_word_progress')
-      .select('*')
-      .eq('user_id', opts.userId)
-      .in('word_id', wordIds)
+    const CHUNK_SIZE = 150
+    const chunks: string[][] = []
+    for (let i = 0; i < wordIds.length; i += CHUNK_SIZE) {
+      chunks.push(wordIds.slice(i, i + CHUNK_SIZE))
+    }
 
-    const progressMap = new Map((progressRows ?? []).map((p: any) => [p.word_id, p]))
+    const results = await Promise.all(
+      chunks.map(chunk =>
+        db.from('user_word_progress')
+          .select('*')
+          .eq('user_id', opts.userId)
+          .in('word_id', chunk)
+      )
+    )
+
+    const allProgress = results.flatMap(r => r.data ?? [])
+    const progressMap = new Map(allProgress.map((p: any) => [p.word_id, p]))
+
     words = words.map(w => ({
       ...w,
       user_progress: progressMap.get(w.id) ?? null,
