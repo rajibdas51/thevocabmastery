@@ -750,15 +750,22 @@ export async function deleteEditorial(id: string): Promise<ApiResponse<null>> {
 }
 
 export async function updateWord(id: string, updates: {
-  word?: string; bangla_meaning?: string; english_meaning?: string
-  synonyms?: string[]; antonyms?: string[]; example?: string
-  part_of_speech?: string; pronunciation?: string
+  word?: string
+  bangla_meaning?: string
+  english_meaning?: string
+  synonyms?: string[]
+  antonyms?: string[]
+  example?: string
+  part_of_speech?: string
+  pronunciation?: string
+  memory_tip?: string
 }): Promise<ApiResponse<any>> {
   const db = createClient()
   const { data, error } = await db
     .from('words').update(updates).eq('id', id).select().single()
   return { data, error: error?.message ?? null }
 }
+ 
 
 export async function updateFocusWriting(id: string, updates: {
   title?: string; category?: string; content?: string; tags?: string[]

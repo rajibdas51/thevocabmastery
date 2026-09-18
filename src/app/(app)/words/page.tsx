@@ -18,6 +18,18 @@ import { cn } from '@/lib/utils'
 
 type SortMode = 'az' | 'za'
 
+const PART_OF_SPEECH_OPTIONS = [
+  { value: '',             label: 'Select part of speech' },
+  { value: 'noun',         label: 'Noun'         },
+  { value: 'verb',         label: 'Verb'         },
+  { value: 'adjective',    label: 'Adjective'    },
+  { value: 'adverb',       label: 'Adverb'       },
+  { value: 'preposition',  label: 'Preposition'  },
+  { value: 'conjunction',  label: 'Conjunction'  },
+  { value: 'pronoun',      label: 'Pronoun'      },
+  { value: 'interjection', label: 'Interjection' },
+]
+
 export default function WordsPage() {
   const { profile }    = useAuthStore()
   const { refresh }    = useStreakStore()
@@ -35,7 +47,11 @@ export default function WordsPage() {
 
   // Edit modal state
   const [editWord,   setEditWord]   = useState<Word | null>(null)
-  const [editForm,   setEditForm]   = useState({ word:'', english_meaning:'', bangla_meaning:'', synonyms:'', antonyms:'', example:'', part_of_speech:'', pronunciation:'' })
+  const [editForm,   setEditForm]   = useState({
+    word: '', english_meaning: '', bangla_meaning: '',
+    synonyms: '', antonyms: '', example: '',
+    part_of_speech: '', pronunciation: '', memory_tip: '',
+  })
   const [saving,     setSaving]     = useState(false)
 
   const PAGE_SIZE = 18
@@ -93,11 +109,15 @@ export default function WordsPage() {
       example:         word.example ?? '',
       part_of_speech:  word.part_of_speech ?? '',
       pronunciation:   word.pronunciation ?? '',
+      memory_tip:      (word as any).memory_tip ?? '',
     })
   }
 
   const handleSaveEdit = async () => {
     if (!editWord) return
+    if (!editForm.word.trim() || !editForm.english_meaning.trim()) {
+      toast('Word and English Meaning are required', 'error'); return
+    }
     setSaving(true)
     const { error } = await updateWord(editWord.id, {
       word:            editForm.word.trim(),
@@ -108,6 +128,7 @@ export default function WordsPage() {
       example:         editForm.example.trim() || undefined,
       part_of_speech:  editForm.part_of_speech || undefined,
       pronunciation:   editForm.pronunciation.trim() || undefined,
+      memory_tip:      editForm.memory_tip.trim() || undefined,
     })
     setSaving(false)
     if (error) { toast(error, 'error'); return }
@@ -209,20 +230,77 @@ export default function WordsPage() {
       <Modal open={!!editWord} onClose={() => setEditWord(null)} title="Edit Word" size="lg">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Word *"          value={editForm.word}            onChange={e => setEditForm(f=>({...f, word:e.target.value}))}            placeholder="English word" />
-            <Input label="Pronunciation"   value={editForm.pronunciation}   onChange={e => setEditForm(f=>({...f, pronunciation:e.target.value}))}   placeholder="/fəˈnetɪk/" />
+            <Input
+              label="Word *"
+              value={editForm.word}
+              onChange={e => setEditForm(f => ({ ...f, word: e.target.value }))}
+              placeholder="English word"
+            />
+            <Input
+              label="Pronunciation"
+              value={editForm.pronunciation}
+              onChange={e => setEditForm(f => ({ ...f, pronunciation: e.target.value }))}
+              placeholder="/fəˈnetɪk/"
+            />
+
             <div className="col-span-1 sm:col-span-2">
-              <Input label="English Meaning *" value={editForm.english_meaning} onChange={e => setEditForm(f=>({...f, english_meaning:e.target.value}))} placeholder="Clear definition" />
+              <Input
+                label="English Meaning *"
+                value={editForm.english_meaning}
+                onChange={e => setEditForm(f => ({ ...f, english_meaning: e.target.value }))}
+                placeholder="Clear definition"
+              />
             </div>
-            <Input label="Bangla Meaning"  value={editForm.bangla_meaning}  onChange={e => setEditForm(f=>({...f, bangla_meaning:e.target.value}))}  placeholder="বাংলা অর্থ" />
-            <Input label="Part of Speech"  value={editForm.part_of_speech}  onChange={e => setEditForm(f=>({...f, part_of_speech:e.target.value}))}  placeholder="noun / verb / adj..." />
-            <Input label="Synonyms (comma separated)" value={editForm.synonyms} onChange={e => setEditForm(f=>({...f, synonyms:e.target.value}))} placeholder="word1, word2" />
-            <Input label="Antonyms (comma separated)" value={editForm.antonyms} onChange={e => setEditForm(f=>({...f, antonyms:e.target.value}))} placeholder="word1, word2" />
+
+            <Input
+              label="Bangla Meaning"
+              value={editForm.bangla_meaning}
+              onChange={e => setEditForm(f => ({ ...f, bangla_meaning: e.target.value }))}
+              placeholder="বাংলা অর্থ"
+            />
+
+            <Select
+              label="Part of Speech"
+              value={editForm.part_of_speech}
+              onChange={v => setEditForm(f => ({ ...f, part_of_speech: v }))}
+              options={PART_OF_SPEECH_OPTIONS}
+            />
+
+            <Input
+              label="Synonyms (comma separated)"
+              value={editForm.synonyms}
+              onChange={e => setEditForm(f => ({ ...f, synonyms: e.target.value }))}
+              placeholder="word1, word2, word3"
+            />
+            <Input
+              label="Antonyms (comma separated)"
+              value={editForm.antonyms}
+              onChange={e => setEditForm(f => ({ ...f, antonyms: e.target.value }))}
+              placeholder="word1, word2, word3"
+            />
+
             <div className="col-span-1 sm:col-span-2">
-              <Textarea label="Example Sentence" value={editForm.example} onChange={e => setEditForm(f=>({...f, example:e.target.value}))} placeholder="Use in a sentence..." />
+              <Textarea
+                label="Example Sentence"
+                value={editForm.example}
+                onChange={e => setEditForm(f => ({ ...f, example: e.target.value }))}
+                placeholder="Use the word in a natural sentence..."
+              />
+            </div>
+
+            <div className="col-span-1 sm:col-span-2">
+              <Textarea
+                label="Memory Tip / Mnemonic"
+                value={editForm.memory_tip}
+                onChange={e => setEditForm(f => ({ ...f, memory_tip: e.target.value }))}
+                placeholder='e.g. "A-BATE — imagine a boy with an A-shaped BAIT luring away trouble until it disappears"'
+              />
             </div>
           </div>
-          <Button onClick={handleSaveEdit} loading={saving} className="w-full" size="lg">Save Changes</Button>
+
+          <Button onClick={handleSaveEdit} loading={saving} className="w-full" size="lg">
+            Save Changes
+          </Button>
         </div>
       </Modal>
     </div>
