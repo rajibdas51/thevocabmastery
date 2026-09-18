@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { Trash2, CheckCircle, Circle, Pencil} from 'lucide-react'
+import { Trash2, CheckCircle, Circle, Pencil } from 'lucide-react'
 import { useSpeech } from '@/hooks/useSpeech'
 import type { Word, PartOfSpeech } from '@/types'
 import { POS_LABELS } from '@/types'
@@ -38,7 +38,6 @@ function SpeakerBtn({
     e.stopPropagation()
     setActive(true)
     speak(word, accent)
-    // Reset visual after ~1.5 s (typical word TTS duration)
     setTimeout(() => setActive(false), 1500)
   }
 
@@ -53,10 +52,7 @@ function SpeakerBtn({
           : 'bg-[var(--bg3)] border-[var(--border2)] text-[var(--text2)] hover:border-[var(--accent)]/40 hover:text-[var(--accent2)] hover:bg-[var(--accent)]/8'
       )}
     >
-      {/* Country flag */}
       <span className="text-base leading-none" aria-label={label}>{flag}</span>
-
-      {/* Speaker icon — extra wave arc when active */}
       <svg
         className="w-3.5 h-3.5 flex-shrink-0"
         viewBox="0 0 24 24" fill="none"
@@ -67,8 +63,6 @@ function SpeakerBtn({
         <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
         {active && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />}
       </svg>
-
-      {/* Label */}
       <span className="hidden sm:inline">{accent === 'en-US' ? 'US' : 'UK'}</span>
     </button>
   )
@@ -86,7 +80,7 @@ interface WordCardProps {
 }
 
 export default function WordCard({
-  word, isAdmin, userId, onDelete, onMarkLearned, compact,
+  word, isAdmin, userId, onDelete, onMarkLearned, onEdit, compact,
 }: WordCardProps) {
   const [open,    setOpen]    = useState(false)
   const [marking, setMarking] = useState(false)
@@ -105,15 +99,46 @@ export default function WordCard({
     [onMarkLearned, word.id, marking]
   )
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onEdit?.(word)
+  }
+
   return (
     <>
       {/* ── Tile ─────────────────────────────────────────── */}
       <div
         onClick={() => setOpen(true)}
-        className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)]"
+        className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-xl hover:shadow-[var(--shadow)] relative"
       >
+        {/* Admin edit button — top-right corner, always visible */}
+        {onEdit && (
+          <button
+            onClick={handleEditClick}
+            title="Edit word"
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-lg border transition-all"
+            style={{
+              background:  'var(--bg3)',
+              borderColor: 'var(--border2)',
+              color:       'var(--text3)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background  = 'var(--accent)' + '18'
+              e.currentTarget.style.borderColor = 'var(--accent)' + '50'
+              e.currentTarget.style.color       = 'var(--accent2)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background  = 'var(--bg3)'
+              e.currentTarget.style.borderColor = 'var(--border2)'
+              e.currentTarget.style.color       = 'var(--text3)'
+            }}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Header */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 pr-8">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-playfair text-[20px] font-black text-[var(--text)] leading-tight">
@@ -157,7 +182,7 @@ export default function WordCard({
         {/* Example */}
         {word.example && !compact && (
           <p className="text-xs text-[var(--text3)] italic border-l-2 border-[var(--border2)] pl-3 line-clamp-2">
-            `{word.example}  `
+            "{word.example}"
           </p>
         )}
 
@@ -195,18 +220,30 @@ export default function WordCard({
                 <p className="text-base mt-1" style={{ color: 'var(--gold)' }}>{word.bangla_meaning}</p>
               )}
             </div>
-            {onMarkLearned && (
-              <Button
-                variant={learned ? 'secondary' : 'primary'}
-                size="sm"
-                loading={marking}
-                onClick={() => handleMarkLearned()}
-                className="flex-shrink-0 mt-1"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-                {learned ? 'Unmark' : 'Mark Learned'}
-              </Button>
-            )}
+
+            {/* Action buttons — Edit + Mark Learned */}
+            <div className="flex items-center gap-2 flex-shrink-0 mt-1">
+              {onEdit && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { onEdit(word); setOpen(false) }}
+                >
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </Button>
+              )}
+              {onMarkLearned && (
+                <Button
+                  variant={learned ? 'secondary' : 'primary'}
+                  size="sm"
+                  loading={marking}
+                  onClick={() => handleMarkLearned()}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  {learned ? 'Unmark' : 'Mark Learned'}
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* ── Pronunciation ── */}
@@ -235,7 +272,22 @@ export default function WordCard({
                 Example Sentence
               </p>
               <p className="text-sm italic text-[var(--text2)] border-l-[3px] border-[var(--accent)] pl-4 leading-relaxed">
-                `{word.example} `
+                "{word.example}"
+              </p>
+            </div>
+          )}
+
+          {/* Memory Tip */}
+          {(word as any).memory_tip && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text3)] mb-2">
+                💡 Memory Tip
+              </p>
+              <p
+                className="text-sm leading-relaxed p-3 rounded-xl"
+                style={{ background: 'var(--accent)' + '0d', color: 'var(--text2)', border: '1px solid var(--accent)' + '20' }}
+              >
+                {(word as any).memory_tip}
               </p>
             </div>
           )}
